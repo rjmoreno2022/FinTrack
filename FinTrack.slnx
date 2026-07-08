@@ -3,4 +3,5 @@
   <Project Path="src/FinTrack.Application/FinTrack.Application.csproj" />
   <Project Path="src/FinTrack.Infrastructure/FinTrack.Infrastructure.csproj" />
   <Project Path="src/FinTrack.Web/FinTrack.Web.csproj" />
+  <Project Path="tests/FinTrack.Domain.Tests/FinTrack.Domain.Tests.csproj" />
 </Solution>
