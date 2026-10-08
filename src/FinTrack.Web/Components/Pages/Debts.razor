@@ -182,6 +182,10 @@ else
                         Abonar
                     </MudButton>
                 }
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               OnClick="() => OpenEditDialog(context)" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Size="Size.Small"
                                Color="Color.Default"
@@ -262,7 +266,22 @@ else
 
         if (result != null && !result.Canceled)
         {
-            Snackbar.Add("Registro de deuda creado exitosamente", Severity.Success);
+            await LoadDebts();
+        }
+    }
+
+    private async Task OpenEditDialog(DebtDto debt)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.DebtDialog>
+        {
+            { x => x.Debt, debt }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.DebtDialog>("Editar Deuda", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
             await LoadDebts();
         }
     }

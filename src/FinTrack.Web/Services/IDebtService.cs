@@ -13,6 +13,7 @@ public interface IDebtService
     Task<List<DebtDto>> GetAllAsync(string? type = null, string? status = null);
     Task<DebtDetailDto?> GetByIdAsync(Guid id);
     Task<Guid> CreateAsync(CreateDebtRequest request);
+    Task UpdateAsync(Guid id, UpdateDebtRequest request);
     Task RegisterPaymentAsync(Guid id, RegisterDebtPaymentRequest request);
     Task DeleteAsync(Guid id);
 }
@@ -57,6 +58,21 @@ public class DebtService : IDebtService
             throw new InvalidOperationException(result.Error ?? "Error al crear la deuda");
 
         return result.Value;
+    }
+
+    public async Task UpdateAsync(Guid id, UpdateDebtRequest request)
+    {
+        var command = new UpdateDebtCommand(
+            id,
+            request.Creditor,
+            request.DueDate,
+            request.Description,
+            request.InterestRate
+        );
+
+        var result = await _mediator.Send(command);
+        if (!result.IsSuccess)
+            throw new InvalidOperationException(result.Error ?? "Error al actualizar la deuda");
     }
 
     public async Task RegisterPaymentAsync(Guid id, RegisterDebtPaymentRequest request)

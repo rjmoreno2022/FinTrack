@@ -10,6 +10,7 @@
                        @bind-Value="_accountId"
                        Required="true"
                        RequiredError="Debe seleccionar una cuenta"
+                       Disabled="@(Transaction != null)"
                        Class="mb-3">
                 @foreach (var acc in _accounts)
                 {
@@ -24,6 +25,7 @@
                        @bind-Value="_type"
                        SelectedValuesChanged="OnTypeChanged"
                        Required="true"
+                       Disabled="@(Transaction != null)"
                        Class="mb-3">
                 <MudSelectItem Value="@("Income")">🟢 Ingreso (+)</MudSelectItem>
                 <MudSelectItem Value="@("Expense")">🔴 Gasto (-)</MudSelectItem>
@@ -37,6 +39,7 @@
                              RequiredError="El monto debe ser mayor a 0"
                              Format="N2"
                              Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                             Disabled="@(Transaction != null)"
                              Class="mb-3" />
 
             <MudSelect T="Guid?"
@@ -80,11 +83,11 @@
             @if (_isSaving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Registrando...</span>
+                <span>@(Transaction == null ? "Registrando..." : "Guardando...")</span>
             }
             else
             {
-                <span>Registrar</span>
+                <span>@(Transaction == null ? "Registrar" : "Guardar")</span>
             }
         </MudButton>
     </DialogActions>
@@ -93,6 +96,9 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public TransactionDto? Transaction { get; set; }
 
     [Parameter]
     public Guid? PreselectedAccountId { get; set; }
@@ -119,7 +125,17 @@
         _accounts = await AccountService.GetAllAsync();
         _categories = await TransactionService.GetCategoriesAsync();
 
-        if (PreselectedAccountId.HasValue && _accounts.Any(a => a.Id == PreselectedAccountId.Value))
+        if (Transaction != null)
+        {
+            _accountId = Transaction.AccountId;
+            _type = Transaction.Type;
+            _amount = Transaction.Amount;
+            _categoryId = Transaction.CategoryId;
+            _date = Transaction.Date;
+            _description = Transaction.Description;
+            _tags = Transaction.Tags;
+        }
+        else if (PreselectedAccountId.HasValue && _accounts.Any(a => a.Id == PreselectedAccountId.Value))
         {
             _accountId = PreselectedAccountId.Value;
         }
@@ -151,19 +167,37 @@
         _isSaving = true;
         try
         {
-            var request = new CreateTransactionRequest
+            if (Transaction == null)
             {
-                AccountId = _accountId,
-                Type = _type,
-                Amount = _amount,
-                Currency = selectedAccount.Currency,
-                Description = _description.Trim(),
-                Date = _date ?? DateTime.UtcNow,
-                CategoryId = _categoryId,
-                Tags = _tags?.Trim()
-            };
+                var request = new CreateTransactionRequest
+                {
+                    AccountId = _accountId,
+                    Type = _type,
+                    Amount = _amount,
+                    Currency = selectedAccount.Currency,
+                    Description = _description.Trim(),
+                    Date = _date ?? DateTime.UtcNow,
+                    CategoryId = _categoryId,
+                    Tags = _tags?.Trim()
+                };
 
-            await TransactionService.CreateAsync(request);
+                await TransactionService.CreateAsync(request);
+                Snackbar.Add("Transacción registrada con éxito", Severity.Success);
+            }
+            else
+            {
+                var request = new UpdateTransactionRequest
+                {
+                    Description = _description.Trim(),
+                    Date = _date ?? DateTime.UtcNow,
+                    CategoryId = _categoryId,
+                    Tags = _tags?.Trim()
+                };
+
+                await TransactionService.UpdateAsync(Transaction.Id, request);
+                Snackbar.Add("Transacción actualizada con éxito", Severity.Success);
+            }
+
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)

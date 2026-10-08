@@ -42,6 +42,7 @@
                     <MudSelect T="string"
                                Label="Moneda"
                                @bind-Value="_currency"
+                               Disabled="@(Budget != null)"
                                Required="true">
                         <MudSelectItem Value="@("USD")">USD - Dólares</MudSelectItem>
                         <MudSelectItem Value="@("VES")">VES - Bolívares</MudSelectItem>
@@ -54,6 +55,7 @@
             <MudSelect T="string"
                        Label="Período"
                        @bind-Value="_period"
+                       Disabled="@(Budget != null)"
                        Required="true"
                        Class="mb-3">
                 <MudSelectItem Value="@("Monthly")">Mensual</MudSelectItem>
@@ -85,11 +87,11 @@
             @if (_isSaving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Guardando...</span>
+                <span>@(Budget == null ? "Guardando..." : "Actualizando...")</span>
             }
             else
             {
-                <span>Crear Presupuesto</span>
+                <span>@(Budget == null ? "Crear Presupuesto" : "Guardar Cambios")</span>
             }
         </MudButton>
     </DialogActions>
@@ -98,6 +100,9 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public BudgetDto? Budget { get; set; }
 
     private MudForm _form = null!;
     private bool _isValid;
@@ -117,6 +122,17 @@
     {
         var allCats = await TransactionService.GetCategoriesAsync();
         _expenseCategories = allCats.Where(c => c.Type.Equals("Expense", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (Budget != null)
+        {
+            _name = Budget.Name;
+            _categoryId = Budget.CategoryId;
+            _limitAmount = Budget.LimitAmount;
+            _currency = Budget.Currency;
+            _period = Budget.Period;
+            _startDate = Budget.StartDate;
+            _endDate = Budget.EndDate;
+        }
     }
 
     private void Cancel() => MudDialog.Cancel();
@@ -141,18 +157,37 @@
         _isSaving = true;
         try
         {
-            var request = new CreateBudgetRequest
+            if (Budget == null)
             {
-                Name = _name.Trim(),
-                LimitAmount = _limitAmount,
-                Currency = _currency,
-                Period = _period,
-                StartDate = _startDate.Value,
-                EndDate = _endDate.Value,
-                CategoryId = _categoryId
-            };
+                var request = new CreateBudgetRequest
+                {
+                    Name = _name.Trim(),
+                    LimitAmount = _limitAmount,
+                    Currency = _currency,
+                    Period = _period,
+                    StartDate = _startDate.Value,
+                    EndDate = _endDate.Value,
+                    CategoryId = _categoryId
+                };
 
-            await BudgetService.CreateAsync(request);
+                await BudgetService.CreateAsync(request);
+                Snackbar.Add("Presupuesto creado exitosamente", Severity.Success);
+            }
+            else
+            {
+                var request = new UpdateBudgetRequest
+                {
+                    Name = _name.Trim(),
+                    LimitAmount = _limitAmount,
+                    StartDate = _startDate.Value,
+                    EndDate = _endDate.Value,
+                    CategoryId = _categoryId
+                };
+
+                await BudgetService.UpdateAsync(Budget.Id, request);
+                Snackbar.Add("Presupuesto actualizado exitosamente", Severity.Success);
+            }
+
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)

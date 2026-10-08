@@ -93,10 +93,16 @@ else
                             <CardHeaderContent>
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                                     <MudText Typo="Typo.h6" Class="font-weight-bold">@goal.Name</MudText>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                   Size="Size.Small"
-                                                   Color="Color.Default"
-                                                   OnClick="() => DeleteGoal(goal)" />
+                                    <MudStack Row="true" Spacing="0">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Size="Size.Small"
+                                                       Color="Color.Primary"
+                                                       OnClick="() => OpenEditDialog(goal)" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Small"
+                                                       Color="Color.Default"
+                                                       OnClick="() => DeleteGoal(goal)" />
+                                    </MudStack>
                                 </MudStack>
                                 <MudStack Row="true" Spacing="1" Class="mt-1">
                                     <MudChip T="string" Size="Size.Small" Color="@GetPriorityColor(goal.Priority)" Variant="Variant.Outlined">
@@ -227,7 +233,22 @@ else
 
         if (result != null && !result.Canceled)
         {
-            Snackbar.Add("Meta creada exitosamente", Severity.Success);
+            await LoadGoals();
+        }
+    }
+
+    private async Task OpenEditDialog(GoalDto goal)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.GoalDialog>
+        {
+            { x => x.Goal, goal }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.GoalDialog>("Editar Meta", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
             await LoadGoals();
         }
     }

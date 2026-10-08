@@ -11,7 +11,9 @@ namespace FinTrack.Web.Services;
 public interface IBudgetService
 {
     Task<List<BudgetDto>> GetAllAsync(bool activeOnly = false);
+    Task<BudgetDto?> GetByIdAsync(Guid id);
     Task<Guid> CreateAsync(CreateBudgetRequest request);
+    Task UpdateAsync(Guid id, UpdateBudgetRequest request);
     Task DeleteAsync(Guid id);
 }
 
@@ -32,6 +34,12 @@ public class BudgetService : IBudgetService
             : new List<BudgetDto>();
     }
 
+    public async Task<BudgetDto?> GetByIdAsync(Guid id)
+    {
+        var result = await _mediator.Send(new GetBudgetByIdQuery(id));
+        return result.IsSuccess ? result.Value : null;
+    }
+
     public async Task<Guid> CreateAsync(CreateBudgetRequest request)
     {
         var command = new CreateBudgetCommand(
@@ -49,6 +57,22 @@ public class BudgetService : IBudgetService
             throw new InvalidOperationException(result.Error ?? "Error al crear presupuesto");
 
         return result.Value;
+    }
+
+    public async Task UpdateAsync(Guid id, UpdateBudgetRequest request)
+    {
+        var command = new UpdateBudgetCommand(
+            id,
+            request.Name,
+            request.LimitAmount,
+            request.StartDate,
+            request.EndDate,
+            request.CategoryId
+        );
+
+        var result = await _mediator.Send(command);
+        if (!result.IsSuccess)
+            throw new InvalidOperationException(result.Error ?? "Error al actualizar presupuesto");
     }
 
     public async Task DeleteAsync(Guid id)

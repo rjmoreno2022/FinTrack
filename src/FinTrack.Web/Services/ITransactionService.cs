@@ -24,6 +24,8 @@ public interface ITransactionService
         int pageSize = 50);
 
     Task<Guid> CreateAsync(CreateTransactionRequest request);
+    Task<TransactionDto?> GetByIdAsync(Guid id);
+    Task UpdateAsync(Guid id, UpdateTransactionRequest request);
     Task DeleteAsync(Guid id);
     Task<List<CategoryDto>> GetCategoriesAsync(string? type = null);
 }
@@ -76,6 +78,20 @@ public class TransactionService : ITransactionService
             throw new InvalidOperationException(result.Error ?? "Error al registrar la transacción");
 
         return result.Value;
+    }
+
+    public async Task<TransactionDto?> GetByIdAsync(Guid id)
+    {
+        var result = await _mediator.Send(new GetTransactionByIdQuery(id));
+        return result.IsSuccess ? result.Value : null;
+    }
+
+    public async Task UpdateAsync(Guid id, UpdateTransactionRequest request)
+    {
+        var command = new UpdateTransactionCommand(id, request.Description, request.Date, request.CategoryId, request.Tags);
+        var result = await _mediator.Send(command);
+        if (!result.IsSuccess)
+            throw new InvalidOperationException(result.Error ?? "Error al actualizar la transacción");
     }
 
     public async Task DeleteAsync(Guid id)

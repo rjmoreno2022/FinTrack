@@ -16,6 +16,7 @@
             <MudSelect T="string"
                        Label="Tipo de Registro"
                        @bind-Value="_type"
+                       Disabled="@(Debt != null)"
                        Required="true"
                        Class="mb-3">
                 <MudSelectItem Value="@("Owed")">🔴 Debo dinero (Pasivo / Deuda por pagar)</MudSelectItem>
@@ -28,6 +29,7 @@
                                      Label="Monto Total Original"
                                      @bind-Value="_originalAmount"
                                      Min="1m"
+                                     Disabled="@(Debt != null)"
                                      Required="true"
                                      RequiredError="El monto debe ser mayor a 0"
                                      Format="N2"
@@ -37,6 +39,7 @@
                     <MudSelect T="string"
                                Label="Moneda"
                                @bind-Value="_currency"
+                               Disabled="@(Debt != null)"
                                Required="true">
                         <MudSelectItem Value="@("USD")">USD - Dólares</MudSelectItem>
                         <MudSelectItem Value="@("VES")">VES - Bolívares</MudSelectItem>
@@ -78,11 +81,11 @@
             @if (_isSaving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Guardando...</span>
+                <span>@(Debt == null ? "Guardando..." : "Actualizando...")</span>
             }
             else
             {
-                <span>Crear Deuda</span>
+                <span>@(Debt == null ? "Crear Deuda" : "Guardar Cambios")</span>
             }
         </MudButton>
     </DialogActions>
@@ -91,6 +94,9 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public DebtDto? Debt { get; set; }
 
     private MudForm _form = null!;
     private bool _isValid;
@@ -104,6 +110,20 @@
     private DateTime? _dueDate = DateTime.Today.AddMonths(1);
     private string? _description;
 
+    protected override void OnInitialized()
+    {
+        if (Debt != null)
+        {
+            _creditor = Debt.Creditor;
+            _type = Debt.Type;
+            _originalAmount = Debt.OriginalAmount;
+            _currency = Debt.Currency;
+            _interestRate = Debt.InterestRate;
+            _dueDate = Debt.DueDate;
+            _description = Debt.Description;
+        }
+    }
+
     private void Cancel() => MudDialog.Cancel();
 
     private async Task Submit()
@@ -114,18 +134,36 @@
         _isSaving = true;
         try
         {
-            var request = new CreateDebtRequest
+            if (Debt == null)
             {
-                Creditor = _creditor.Trim(),
-                Type = _type,
-                OriginalAmount = _originalAmount,
-                Currency = _currency,
-                InterestRate = _interestRate,
-                DueDate = _dueDate,
-                Description = _description?.Trim()
-            };
+                var request = new CreateDebtRequest
+                {
+                    Creditor = _creditor.Trim(),
+                    Type = _type,
+                    OriginalAmount = _originalAmount,
+                    Currency = _currency,
+                    InterestRate = _interestRate,
+                    DueDate = _dueDate,
+                    Description = _description?.Trim()
+                };
 
-            await DebtService.CreateAsync(request);
+                await DebtService.CreateAsync(request);
+                Snackbar.Add("Deuda creada exitosamente", Severity.Success);
+            }
+            else
+            {
+                var request = new UpdateDebtRequest
+                {
+                    Creditor = _creditor.Trim(),
+                    InterestRate = _interestRate,
+                    DueDate = _dueDate,
+                    Description = _description?.Trim()
+                };
+
+                await DebtService.UpdateAsync(Debt.Id, request);
+                Snackbar.Add("Deuda actualizada exitosamente", Severity.Success);
+            }
+
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)

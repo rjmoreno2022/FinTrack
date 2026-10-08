@@ -45,6 +45,31 @@ public class BudgetsController : ControllerBase
             : BadRequest(new { error = result.Error, errors = result.Errors });
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var result = await _mediator.Send(new GetBudgetByIdQuery(id));
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBudgetRequest request)
+    {
+        var command = new UpdateBudgetCommand(
+            id,
+            request.Name,
+            request.LimitAmount,
+            request.StartDate,
+            request.EndDate,
+            request.CategoryId
+        );
+
+        var result = await _mediator.Send(command);
+        return result.IsSuccess
+            ? NoContent()
+            : BadRequest(new { error = result.Error, errors = result.Errors });
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

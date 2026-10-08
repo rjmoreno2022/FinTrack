@@ -60,6 +60,23 @@ public class DebtsController : ControllerBase
         return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Error });
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDebtRequest request)
+    {
+        var command = new UpdateDebtCommand(
+            id,
+            request.Creditor,
+            request.DueDate,
+            request.Description,
+            request.InterestRate
+        );
+
+        var result = await _mediator.Send(command);
+        return result.IsSuccess
+            ? NoContent()
+            : BadRequest(new { error = result.Error, errors = result.Errors });
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

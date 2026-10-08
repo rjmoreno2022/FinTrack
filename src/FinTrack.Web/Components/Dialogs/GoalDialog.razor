@@ -28,6 +28,7 @@
                     <MudSelect T="string"
                                Label="Moneda"
                                @bind-Value="_currency"
+                               Disabled="@(Goal != null)"
                                Required="true">
                         <MudSelectItem Value="@("USD")">USD - Dólares</MudSelectItem>
                         <MudSelectItem Value="@("VES")">VES - Bolívares</MudSelectItem>
@@ -72,11 +73,11 @@
             @if (_isSaving)
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Guardando...</span>
+                <span>@(Goal == null ? "Guardando..." : "Actualizando...")</span>
             }
             else
             {
-                <span>Crear Meta</span>
+                <span>@(Goal == null ? "Crear Meta" : "Guardar Cambios")</span>
             }
         </MudButton>
     </DialogActions>
@@ -85,6 +86,9 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public GoalDto? Goal { get; set; }
 
     private MudForm _form = null!;
     private bool _isValid;
@@ -97,6 +101,19 @@
     private DateTime? _targetDate = DateTime.Today.AddMonths(6);
     private string? _description;
 
+    protected override void OnInitialized()
+    {
+        if (Goal != null)
+        {
+            _name = Goal.Name;
+            _targetAmount = Goal.TargetAmount;
+            _currency = Goal.Currency;
+            _priority = Goal.Priority;
+            _targetDate = Goal.TargetDate;
+            _description = Goal.Description;
+        }
+    }
+
     private void Cancel() => MudDialog.Cancel();
 
     private async Task Submit()
@@ -107,17 +124,36 @@
         _isSaving = true;
         try
         {
-            var request = new CreateGoalRequest
+            if (Goal == null)
             {
-                Name = _name.Trim(),
-                TargetAmount = _targetAmount,
-                Currency = _currency,
-                Priority = _priority,
-                TargetDate = _targetDate,
-                Description = _description?.Trim()
-            };
+                var request = new CreateGoalRequest
+                {
+                    Name = _name.Trim(),
+                    TargetAmount = _targetAmount,
+                    Currency = _currency,
+                    Priority = _priority,
+                    TargetDate = _targetDate,
+                    Description = _description?.Trim()
+                };
 
-            await GoalService.CreateAsync(request);
+                await GoalService.CreateAsync(request);
+                Snackbar.Add("Meta creada exitosamente", Severity.Success);
+            }
+            else
+            {
+                var request = new UpdateGoalRequest
+                {
+                    Name = _name.Trim(),
+                    TargetAmount = _targetAmount,
+                    TargetDate = _targetDate,
+                    Description = _description?.Trim(),
+                    Priority = _priority
+                };
+
+                await GoalService.UpdateAsync(Goal.Id, request);
+                Snackbar.Add("Meta actualizada exitosamente", Severity.Success);
+            }
+
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)

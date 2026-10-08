@@ -1,0 +1,207 @@
+@page "/categories"
+@inject ICategoryService CategoryService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Categorías - FinTrack</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4 mb-8">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <div>
+            <MudText Typo="Typo.h4" Color="Color.Primary" Class="font-weight-bold">
+                <MudIcon Icon="@Icons.Material.Filled.Category" Class="mr-2 mb-n1" />
+                Categorías
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Administra las clasificaciones para tus ingresos y gastos
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
+            Nueva Categoría
+        </MudButton>
+    </div>
+
+    <!-- Filtros -->
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4">
+                <MudTextField @bind-Value="_searchString"
+                              Placeholder="Buscar categoría..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium"
+                              Immediate="true"
+                              Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudSelect T="string" Label="Filtrar por Tipo" @bind-Value="_selectedType" SelectedValuesChanged="LoadCategories">
+                    <MudSelectItem Value="@("All")">Todas las categorías</MudSelectItem>
+                    <MudSelectItem Value="@("Expense")">Solo Gastos</MudSelectItem>
+                    <MudSelectItem Value="@("Income")">Solo Ingresos</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Tabla de Categorías -->
+    <MudTable Items="@FilteredCategories"
+              Loading="@_loading"
+              Hover="true"
+              Striped="true"
+              Elevation="2">
+        <HeaderContent>
+            <MudTh>Icono & Color</MudTh>
+            <MudTh>Nombre</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Origen</MudTh>
+            <MudTh Style="text-align: right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Icono">
+                <div class="d-flex align-center">
+                    <span style="display: inline-block; width: 14px; height: 14px; border-radius: 50%; background-color: @(context.Color ?? "#58a6ff"); margin-right: 8px;"></span>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@(context.Icon ?? "category")</MudText>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Nombre">
+                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Name</MudText>
+            </MudTd>
+            <MudTd DataLabel="Tipo">
+                @if (context.Type == "Income")
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">Ingreso</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Outlined">Gasto</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Origen">
+                @if (context.IsSystem)
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Filled">Sistema</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">Personalizada</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Acciones" Style="text-align: right">
+                @if (context.IsSystem)
+                {
+                    <MudTooltip Text="Categoría del sistema protegida">
+                        <MudIconButton Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Disabled="true" />
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="Editar categoría">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="() => OpenEditDialog(context)" />
+                    </MudTooltip>
+                    <MudTooltip Text="Eliminar categoría">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="() => DeleteCategory(context)" />
+                    </MudTooltip>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4 text-center">No se encontraron categorías.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<CategoryDto> _categories = new();
+    private bool _loading = true;
+    private string _searchString = string.Empty;
+    private string _selectedType = "All";
+
+    private IEnumerable<CategoryDto> FilteredCategories =>
+        _categories.Where(c =>
+            string.IsNullOrWhiteSpace(_searchString) ||
+            c.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+            (c.Icon != null && c.Icon.Contains(_searchString, StringComparison.OrdinalIgnoreCase)));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        _loading = true;
+        try
+        {
+            var typeFilter = _selectedType == "All" ? null : _selectedType;
+            _categories = await CategoryService.GetAllAsync(typeFilter);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar categorías: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.CategoryDialog>("Nueva Categoría", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadCategories();
+        }
+    }
+
+    private async Task OpenEditDialog(CategoryDto category)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.CategoryDialog>
+        {
+            { x => x.Category, category }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.CategoryDialog>("Editar Categoría", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadCategories();
+        }
+    }
+
+    private async Task DeleteCategory(CategoryDto category)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Confirmar eliminación",
+            $"¿Estás seguro de que deseas eliminar la categoría '{category.Name}'?",
+            yesText: "Eliminar",
+            cancelText: "Cancelar");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await CategoryService.DeleteAsync(category.Id);
+                Snackbar.Add("Categoría eliminada", Severity.Success);
+                await LoadCategories();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+    }
+}

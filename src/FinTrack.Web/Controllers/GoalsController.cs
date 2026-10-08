@@ -59,6 +59,24 @@ public class GoalsController : ControllerBase
         return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Error });
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateGoalRequest request)
+    {
+        var command = new UpdateGoalCommand(
+            id,
+            request.Name,
+            request.TargetAmount,
+            request.TargetDate,
+            request.Description,
+            request.Priority
+        );
+
+        var result = await _mediator.Send(command);
+        return result.IsSuccess
+            ? NoContent()
+            : BadRequest(new { error = result.Error, errors = result.Errors });
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

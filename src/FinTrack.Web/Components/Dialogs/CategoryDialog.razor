@@ -1,0 +1,155 @@
+@inject ICategoryService CategoryService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField T="string"
+                          Label="Nombre de la Categoría"
+                          @bind-Value="_name"
+                          Required="true"
+                          RequiredError="El nombre es obligatorio"
+                          MaxLength="100"
+                          Class="mb-3" />
+
+            @if (Category == null)
+            {
+                <MudSelect T="string"
+                           Label="Tipo"
+                           @bind-Value="_type"
+                           Required="true"
+                           Class="mb-3">
+                    <MudSelectItem Value="@("Expense")">Gasto</MudSelectItem>
+                    <MudSelectItem Value="@("Income")">Ingreso</MudSelectItem>
+                </MudSelect>
+            }
+
+            <MudSelect T="string?"
+                       Label="Icono"
+                       @bind-Value="_icon"
+                       Class="mb-3">
+                <MudSelectItem T="string?" Value="@((string?)null)">Sin icono</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("shopping_cart")">🛒 Compras (shopping_cart)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("restaurant")">🍔 Comida (restaurant)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("directions_car")">🚗 Transporte (directions_car)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("home")">🏠 Hogar (home)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("medical_services")">💊 Salud (medical_services)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("school")">🎓 Educación (school)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("sports_esports")">🎮 Entretenimiento (sports_esports)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("payments")">💵 Salario/Ingreso (payments)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("trending_up")">📈 Inversiones (trending_up)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("receipt_long")">🧾 Servicios (receipt_long)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("fitness_center")">🏋️ Gimnasio/Deportes (fitness_center)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("flight")">✈️ Viajes (flight)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("savings")">💰 Ahorros (savings)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("category")">🏷️ Otro (category)</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string?"
+                       Label="Color"
+                       @bind-Value="_color"
+                       Class="mb-3">
+                <MudSelectItem T="string?" Value="@((string?)null)">Predeterminado</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#58a6ff")">🔵 Azul (#58a6ff)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#238636")">🟢 Verde (#238636)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#da3633")">🔴 Rojo (#da3633)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#d29922")">🟡 Ámbar (#d29922)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#bc8cff")">🟣 Morado (#bc8cff)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#f0883e")">🟠 Naranja (#f0883e)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#39c5bb")">🩵 Turquesa (#39c5bb)</MudSelectItem>
+                <MudSelectItem T="string?" Value="@("#8b949e")">⚪ Gris (#8b949e)</MudSelectItem>
+            </MudSelect>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Guardando...</span>
+            }
+            else
+            {
+                <span>Guardar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public CategoryDto? Category { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private string _name = string.Empty;
+    private string _type = "Expense";
+    private string? _icon;
+    private string? _color;
+
+    protected override void OnInitialized()
+    {
+        if (Category != null)
+        {
+            _name = Category.Name;
+            _type = Category.Type;
+            _icon = Category.Icon;
+            _color = Category.Color;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isSaving = true;
+        try
+        {
+            if (Category == null)
+            {
+                var request = new CreateCategoryRequest
+                {
+                    Name = _name.Trim(),
+                    Type = _type,
+                    Icon = _icon,
+                    Color = _color
+                };
+                await CategoryService.CreateAsync(request);
+                Snackbar.Add("Categoría creada exitosamente", Severity.Success);
+            }
+            else
+            {
+                var request = new UpdateCategoryRequest
+                {
+                    Name = _name.Trim(),
+                    Icon = _icon,
+                    Color = _color
+                };
+                await CategoryService.UpdateAsync(Category.Id, request);
+                Snackbar.Add("Categoría actualizada exitosamente", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

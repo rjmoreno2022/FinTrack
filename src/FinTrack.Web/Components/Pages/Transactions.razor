@@ -137,6 +137,10 @@ else
                 </MudText>
             </MudTd>
             <MudTd Style="text-align: right">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               OnClick="() => OpenEditDialog(context)" />
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Size="Size.Small"
                                Color="Color.Error"
@@ -206,7 +210,22 @@ else
 
         if (result != null && !result.Canceled)
         {
-            Snackbar.Add("Transacción registrada correctamente", Severity.Success);
+            await LoadTransactions();
+        }
+    }
+
+    private async Task OpenEditDialog(TransactionDto transaction)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.TransactionDialog>
+        {
+            { x => x.Transaction, transaction }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.TransactionDialog>("Editar Movimiento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
             await LoadTransactions();
         }
     }

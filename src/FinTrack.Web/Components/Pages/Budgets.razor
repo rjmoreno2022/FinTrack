@@ -93,10 +93,16 @@ else
                             <CardHeaderContent>
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                                     <MudText Typo="Typo.h6" Class="font-weight-bold">@budget.Name</MudText>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                   Size="Size.Small"
-                                                   Color="Color.Default"
-                                                   OnClick="() => DeleteBudget(budget)" />
+                                    <MudStack Row="true" Spacing="0">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Size="Size.Small"
+                                                       Color="Color.Primary"
+                                                       OnClick="() => OpenEditDialog(budget)" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Small"
+                                                       Color="Color.Default"
+                                                       OnClick="() => DeleteBudget(budget)" />
+                                    </MudStack>
                                 </MudStack>
                                 <MudStack Row="true" Spacing="1" Class="mt-1">
                                     @if (!string.IsNullOrEmpty(budget.CategoryName))
@@ -198,7 +204,22 @@ else
 
         if (result != null && !result.Canceled)
         {
-            Snackbar.Add("Presupuesto creado exitosamente", Severity.Success);
+            await LoadBudgets();
+        }
+    }
+
+    private async Task OpenEditDialog(BudgetDto budget)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.BudgetDialog>
+        {
+            { x => x.Budget, budget }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.BudgetDialog>("Editar Presupuesto", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
             await LoadBudgets();
         }
     }

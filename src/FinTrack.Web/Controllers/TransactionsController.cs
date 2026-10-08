@@ -58,6 +58,30 @@ public class TransactionsController : ControllerBase
             : BadRequest(new { error = result.Error, errors = result.Errors });
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var result = await _mediator.Send(new GetTransactionByIdQuery(id));
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTransactionRequest request)
+    {
+        var command = new UpdateTransactionCommand(
+            id,
+            request.Description,
+            request.Date,
+            request.CategoryId,
+            request.Tags
+        );
+
+        var result = await _mediator.Send(command);
+        return result.IsSuccess
+            ? NoContent()
+            : BadRequest(new { error = result.Error, errors = result.Errors });
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

@@ -13,6 +13,7 @@ public interface IGoalService
     Task<List<GoalDto>> GetAllAsync(bool activeOnly = false);
     Task<GoalDto?> GetByIdAsync(Guid id);
     Task<Guid> CreateAsync(CreateGoalRequest request);
+    Task UpdateAsync(Guid id, UpdateGoalRequest request);
     Task ContributeAsync(Guid id, decimal amount);
     Task DeleteAsync(Guid id);
 }
@@ -56,6 +57,22 @@ public class GoalService : IGoalService
             throw new InvalidOperationException(result.Error ?? "Error al crear meta de ahorro");
 
         return result.Value;
+    }
+
+    public async Task UpdateAsync(Guid id, UpdateGoalRequest request)
+    {
+        var command = new UpdateGoalCommand(
+            id,
+            request.Name,
+            request.TargetAmount,
+            request.TargetDate,
+            request.Description,
+            request.Priority
+        );
+
+        var result = await _mediator.Send(command);
+        if (!result.IsSuccess)
+            throw new InvalidOperationException(result.Error ?? "Error al actualizar la meta");
     }
 
     public async Task ContributeAsync(Guid id, decimal amount)
