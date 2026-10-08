@@ -59,6 +59,24 @@ public class Account : Entity, IAggregateRoot
         return transaction;
     }
 
+    public void RemoveTransaction(Guid transactionId)
+    {
+        var transaction = Transactions.FirstOrDefault(t => t.Id == transactionId);
+        if (transaction == null)
+            throw new DomainException("Transacción no encontrada en esta cuenta");
+
+        Balance = transaction.Type switch
+        {
+            TransactionType.Income => Balance - transaction.Amount,
+            TransactionType.Expense => Balance + transaction.Amount,
+            TransactionType.Transfer => Balance + transaction.Amount,
+            _ => throw new DomainException("Tipo de transacción no válido")
+        };
+
+        Transactions.Remove(transaction);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void UpdateInfo(string name, string? description)
     {
         if (string.IsNullOrWhiteSpace(name))

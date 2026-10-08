@@ -1,7 +1,476 @@
-﻿@page "/"
+@page "/"
+@implements IDisposable
+@inject IReportService ReportService
+@inject IAccountService AccountService
+@inject ITransactionService TransactionService
+@inject AppState AppState
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard - FinTrack</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">📊 Dashboard Financiero</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Resumen en tiempo real de tu salud financiera, liquidez y analítica patrimonial
+        </MudText>
+    </div>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.AccountBalanceWallet"
+                   OnClick="OpenCreateAccountDialog">
+            Nueva Cuenta
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateTransactionDialog">
+            Registrar Movimiento
+        </MudButton>
+    </MudStack>
+</MudStack>
 
-Welcome to your new app.
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-6" />
+}
+else
+{
+    <!-- Tarjetas de Métricas Principales (KPIs) -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Balance Total</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Primary" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="@(_summary.TotalBalanceUSD >= 0 ? Color.Success : Color.Error)">
+                        @AppState.CurrencySymbol@AppState.ConvertToDisplay(_summary.TotalBalanceUSD, "USD").ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        En @_summary.ActiveAccountsCount cuentas activas
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Ingresos del Mes</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="Color.Success">
+                        +@AppState.CurrencySymbol@AppState.ConvertToDisplay(_summary.MonthlyIncome, "USD").ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Mes en curso
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Gastos del Mes</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Color="Color.Error" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="Color.Error">
+                        -@AppState.CurrencySymbol@AppState.ConvertToDisplay(_summary.MonthlyExpenses, "USD").ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Salidas acumuladas
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Tasa de Ahorro</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Savings" Color="Color.Info" />
+                    </MudStack>
+                    <MudStack Row="true" AlignItems="AlignItems.Baseline" Class="mt-2">
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="@GetSavingsRateColor(_summary.SavingsRate)">
+                            @_summary.SavingsRate.ToString("N1")%
+                        </MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @(_summary.SavingsRate >= 20 ? "¡Excelente hábito de ahorro!" : _summary.SavingsRate > 0 ? "Ahorro positivo" : "Sin capacidad de ahorro")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Fila de Gráficos de Analítica Visual (MudChart) -->
+    <MudGrid Class="mb-6">
+        <!-- Gráfico Donut: Distribución de Gastos por Categoría -->
+        <MudItem xs="12" md="5">
+            <MudCard Elevation="2" Class="rounded-lg h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">🥧 Gastos por Categoría</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Distribución porcentual del mes actual</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent Class="d-flex flex-column align-center justify-center py-4">
+                    @if (!_categoryExpenses.Any())
+                    {
+                        <div class="py-12 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.PieChartOutline" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                No se han registrado gastos en el mes actual.
+                            </MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Donut"
+                                  InputData="@_donutData"
+                                  InputLabels="@_donutLabels"
+                                  Width="300px"
+                                  Height="300px" />
+
+                        <MudStack Spacing="1" Class="w-100 mt-4">
+                            @foreach (var cat in _categoryExpenses.Take(4))
+                            {
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.caption" Class="font-weight-bold">@cat.CategoryName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        $@cat.Amount.ToString("N2") (@cat.Percentage%)
+                                    </MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Gráfico de Barras: Comparativa Mensual Ingresos vs Gastos -->
+        <MudItem xs="12" md="7">
+            <MudCard Elevation="2" Class="rounded-lg h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">📈 Flujo de Caja Histórico</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Ingresos vs Gastos (Últimos 6 Meses)</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent Class="py-2">
+                    @if (!_monthlyCashFlow.Any(m => m.Income > 0 || m.Expense > 0))
+                    {
+                        <div class="py-12 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Se requieren transacciones registradas para graficar el histórico.
+                            </MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Bar"
+                                  ChartSeries="@_barSeries"
+                                  XAxisLabels="@_barLabels"
+                                  Width="100%"
+                                  Height="300px" />
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Resumen de Salud Financiera y Planificación -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg h-100 cursor-pointer" @onclick='() => Navigation.NavigateTo("/budgets")'>
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Presupuestos</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Primary" Size="Size.Small" />
+                    </MudStack>
+                    <MudText Typo="Typo.h6" Class="mt-2 font-weight-bold">
+                        @_health.ActiveBudgetsCount activos
+                    </MudText>
+                    @if (_health.OverbudgetCount > 0)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error" Class="font-weight-bold">
+                            ⚠️ @_health.OverbudgetCount presupuestos sobregirados
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Success">
+                            ✓ Todos dentro de los límites
+                        </MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg h-100 cursor-pointer" @onclick='() => Navigation.NavigateTo("/goals")'>
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Metas de Ahorro</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Flag" Color="Color.Success" Size="Size.Small" />
+                    </MudStack>
+                    <MudText Typo="Typo.h6" Class="mt-2 font-weight-bold">
+                        @_health.TotalGoalsActive en curso
+                    </MudText>
+                    <MudProgressLinear Color="Color.Success" Value="@((double)_health.GoalsProgressAverage)" Class="my-1" Rounded="true" Size="Size.Small" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @_health.GoalsProgressAverage% de avance global
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg h-100 cursor-pointer" @onclick='() => Navigation.NavigateTo("/debts")'>
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Deudas y Pasivos</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Warning" Size="Size.Small" />
+                    </MudStack>
+                    <MudText Typo="Typo.h6" Class="mt-2 font-weight-bold" Color="@(_health.TotalDebtOwed > 0 ? Color.Error : Color.Default)">
+                        @AppState.CurrencySymbol@AppState.ConvertToDisplay(_health.TotalDebtOwed, "USD").ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Por cobrar: @AppState.CurrencySymbol@AppState.ConvertToDisplay(_health.TotalDebtReceivable, "USD").ToString("N2")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Sección de Detalle: Cuentas y Últimos Movimientos -->
+    <MudGrid>
+        <!-- Cuentas Registradas -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2" Class="rounded-lg h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">💳 Mis Cuentas</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo("/accounts"))">
+                            Ver Todas
+                        </MudButton>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (!_accounts.Any())
+                    {
+                        <MudText Color="Color.Secondary" Align="Align.Center" Class="py-6">
+                            No tienes cuentas activas registradas. ¡Crea una para comenzar!
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudList T="AccountDto">
+                            @foreach (var account in _accounts.Take(5))
+                            {
+                                <MudListItem>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                                            <MudIcon Icon="@GetAccountIcon(account.Type)" Size="Size.Medium" Class="mr-3" Color="Color.Primary" />
+                                            <div>
+                                                <MudText Typo="Typo.body2" Class="font-weight-bold">@account.Name</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@account.Type</MudText>
+                                            </div>
+                                        </MudStack>
+                                        <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(account.Balance >= 0 ? Color.Success : Color.Error)">
+                                            @account.Currency @account.Balance.ToString("N2")
+                                        </MudText>
+                                    </MudStack>
+                                </MudListItem>
+                                <MudDivider />
+                            }
+                        </MudList>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Últimas Transacciones -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2" Class="rounded-lg h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">⏱️ Últimos Movimientos</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo("/transactions"))">
+                            Ver Historial
+                        </MudButton>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (!_recentTransactions.Any())
+                    {
+                        <MudText Color="Color.Secondary" Align="Align.Center" Class="py-6">
+                            No hay movimientos registrados recientemente.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudList T="TransactionDto">
+                            @foreach (var t in _recentTransactions.Take(5))
+                            {
+                                <MudListItem>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <div>
+                                            <MudText Typo="Typo.body2" Class="font-weight-bold">@t.Description</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @t.AccountName • @t.Date.ToLocalTime().ToString("dd/MM/yyyy")
+                                            </MudText>
+                                        </div>
+                                        <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(t.Type == "Income" ? Color.Success : Color.Error)">
+                                            @(t.Type == "Income" ? "+" : "-") @t.Currency @t.Amount.ToString("N2")
+                                        </MudText>
+                                    </MudStack>
+                                </MudListItem>
+                                <MudDivider />
+                            }
+                        </MudList>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardSummaryDto _summary = new();
+    private FinancialHealthSummaryDto _health = new();
+    private List<CategoryExpenseReportDto> _categoryExpenses = new();
+    private List<MonthlyCashFlowDto> _monthlyCashFlow = new();
+    private List<AccountDto> _accounts = new();
+    private List<TransactionDto> _recentTransactions = new();
+    private bool _isLoading = true;
+
+    // MudChart Data
+    private double[] _donutData = Array.Empty<double>();
+    private string[] _donutLabels = Array.Empty<string>();
+    private List<ChartSeries<double>> _barSeries = new();
+    private string[] _barLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState.OnChange += StateHasChanged;
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        _isLoading = true;
+        try
+        {
+            _summary = await ReportService.GetDashboardSummaryAsync();
+            _health = await ReportService.GetFinancialHealthSummaryAsync();
+            _categoryExpenses = await ReportService.GetCategoryExpensesAsync();
+            _monthlyCashFlow = await ReportService.GetMonthlyCashFlowAsync(monthsCount: 6);
+            _accounts = await AccountService.GetAllAsync();
+
+            var pagedTransactions = await TransactionService.GetAllAsync(pageSize: 5);
+            _recentTransactions = pagedTransactions.Items.ToList();
+
+            // Preparar datos para MudChart Donut
+            if (_categoryExpenses.Any())
+            {
+                _donutData = _categoryExpenses.Select(c => (double)c.Amount).ToArray();
+                _donutLabels = _categoryExpenses.Select(c => $"{c.CategoryName} ({c.Percentage:N0}%)").ToArray();
+            }
+
+            // Preparar datos para MudChart Bar
+            if (_monthlyCashFlow.Any())
+            {
+                _barLabels = _monthlyCashFlow.Select(m => m.MonthLabel).ToArray();
+                _barSeries = new List<ChartSeries<double>>
+                {
+                    new ChartSeries<double> { Name = "Ingresos (+)", Data = _monthlyCashFlow.Select(m => (double)m.Income).ToArray() },
+                    new ChartSeries<double> { Name = "Gastos (-)", Data = _monthlyCashFlow.Select(m => (double)m.Expense).ToArray() }
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar dashboard: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateAccountDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.AccountDialog>("Nueva Cuenta", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Cuenta creada exitosamente", Severity.Success);
+            await LoadDashboardData();
+        }
+    }
+
+    private async Task OpenCreateTransactionDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.TransactionDialog>("Nuevo Movimiento", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Transacción registrada con éxito", Severity.Success);
+            await LoadDashboardData();
+        }
+    }
+
+    private Color GetSavingsRateColor(decimal rate)
+    {
+        if (rate >= 20) return Color.Success;
+        if (rate > 0) return Color.Warning;
+        return Color.Error;
+    }
+
+    private string GetAccountIcon(string type) => type switch
+    {
+        "Bank" => Icons.Material.Filled.AccountBalance,
+        "Cash" => Icons.Material.Filled.Money,
+        "Crypto" => Icons.Material.Filled.CurrencyBitcoin,
+        "Wallet" => Icons.Material.Filled.Wallet,
+        _ => Icons.Material.Filled.AccountBalanceWallet
+    };
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

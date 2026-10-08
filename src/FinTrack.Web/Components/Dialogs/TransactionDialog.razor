@@ -1,0 +1,178 @@
+@inject ITransactionService TransactionService
+@inject IAccountService AccountService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudSelect T="Guid"
+                       Label="Cuenta"
+                       @bind-Value="_accountId"
+                       Required="true"
+                       RequiredError="Debe seleccionar una cuenta"
+                       Class="mb-3">
+                @foreach (var acc in _accounts)
+                {
+                    <MudSelectItem Value="@acc.Id">
+                        @acc.Name (@acc.Currency @acc.Balance.ToString("N2"))
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="string"
+                       Label="Tipo de Movimiento"
+                       @bind-Value="_type"
+                       SelectedValuesChanged="OnTypeChanged"
+                       Required="true"
+                       Class="mb-3">
+                <MudSelectItem Value="@("Income")">🟢 Ingreso (+)</MudSelectItem>
+                <MudSelectItem Value="@("Expense")">🔴 Gasto (-)</MudSelectItem>
+            </MudSelect>
+
+            <MudNumericField T="decimal"
+                             Label="Monto"
+                             @bind-Value="_amount"
+                             Min="0.01m"
+                             Required="true"
+                             RequiredError="El monto debe ser mayor a 0"
+                             Format="N2"
+                             Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                             Class="mb-3" />
+
+            <MudSelect T="Guid?"
+                       Label="Categoría"
+                       @bind-Value="_categoryId"
+                       Clearable="true"
+                       Class="mb-3">
+                @foreach (var cat in _filteredCategories)
+                {
+                    <MudSelectItem Value="@((Guid?)cat.Id)">
+                        @cat.Name
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudDatePicker Label="Fecha"
+                           @bind-Date="_date"
+                           Required="true"
+                           Class="mb-3" />
+
+            <MudTextField T="string"
+                          Label="Descripción"
+                          @bind-Value="_description"
+                          Required="true"
+                          RequiredError="La descripción es obligatoria"
+                          MaxLength="500"
+                          Class="mb-3" />
+
+            <MudTextField T="string?"
+                          Label="Etiquetas / Tags (Opcional, separadas por coma)"
+                          @bind-Value="_tags"
+                          MaxLength="255" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving || _accountId == Guid.Empty)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Registrando...</span>
+            }
+            else
+            {
+                <span>Registrar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Guid? PreselectedAccountId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private List<AccountDto> _accounts = new();
+    private List<CategoryDto> _categories = new();
+    private IEnumerable<CategoryDto> _filteredCategories =>
+        _categories.Where(c => c.Type.Equals(_type, StringComparison.OrdinalIgnoreCase));
+
+    private Guid _accountId;
+    private string _type = "Expense";
+    private decimal _amount = 10m;
+    private Guid? _categoryId;
+    private DateTime? _date = DateTime.Today;
+    private string _description = string.Empty;
+    private string? _tags;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _accounts = await AccountService.GetAllAsync();
+        _categories = await TransactionService.GetCategoriesAsync();
+
+        if (PreselectedAccountId.HasValue && _accounts.Any(a => a.Id == PreselectedAccountId.Value))
+        {
+            _accountId = PreselectedAccountId.Value;
+        }
+        else if (_accounts.Any())
+        {
+            _accountId = _accounts.First().Id;
+        }
+    }
+
+    private void OnTypeChanged(IEnumerable<string> values)
+    {
+        _categoryId = null; // Reiniciar categoría al cambiar tipo
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        var selectedAccount = _accounts.FirstOrDefault(a => a.Id == _accountId);
+        if (selectedAccount == null)
+        {
+            Snackbar.Add("Debe seleccionar una cuenta válida", Severity.Warning);
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var request = new CreateTransactionRequest
+            {
+                AccountId = _accountId,
+                Type = _type,
+                Amount = _amount,
+                Currency = selectedAccount.Currency,
+                Description = _description.Trim(),
+                Date = _date ?? DateTime.UtcNow,
+                CategoryId = _categoryId,
+                Tags = _tags?.Trim()
+            };
+
+            await TransactionService.CreateAsync(request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

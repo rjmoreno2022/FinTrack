@@ -1,0 +1,132 @@
+@inject IGoalService GoalService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField T="string"
+                          Label="Nombre de la Meta"
+                          @bind-Value="_name"
+                          Required="true"
+                          RequiredError="El nombre es obligatorio"
+                          Placeholder="ej. Fondo de Emergencia, Comprar Laptop"
+                          MaxLength="100"
+                          Class="mb-3" />
+
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal"
+                                     Label="Monto Objetivo"
+                                     @bind-Value="_targetAmount"
+                                     Min="1m"
+                                     Required="true"
+                                     RequiredError="El monto debe ser mayor a 0"
+                                     Format="N2"
+                                     Culture="@System.Globalization.CultureInfo.InvariantCulture" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string"
+                               Label="Moneda"
+                               @bind-Value="_currency"
+                               Required="true">
+                        <MudSelectItem Value="@("USD")">USD - Dólares</MudSelectItem>
+                        <MudSelectItem Value="@("VES")">VES - Bolívares</MudSelectItem>
+                        <MudSelectItem Value="@("USDT")">USDT - Tether</MudSelectItem>
+                        <MudSelectItem Value="@("EUR")">EUR - Euros</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string"
+                               Label="Prioridad"
+                               @bind-Value="_priority"
+                               Required="true">
+                        <MudSelectItem Value="@("Low")">Baja</MudSelectItem>
+                        <MudSelectItem Value="@("Medium")">Media</MudSelectItem>
+                        <MudSelectItem Value="@("High")">Alta</MudSelectItem>
+                        <MudSelectItem Value="@("Critical")">Crítica</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Fecha Objetivo (Opcional)"
+                                   @bind-Date="_targetDate"
+                                   Clearable="true" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTextField T="string?"
+                          Label="Descripción (Opcional)"
+                          @bind-Value="_description"
+                          Lines="2"
+                          MaxLength="500" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Guardando...</span>
+            }
+            else
+            {
+                <span>Crear Meta</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private string _name = string.Empty;
+    private decimal _targetAmount = 500m;
+    private string _currency = "USD";
+    private string _priority = "Medium";
+    private DateTime? _targetDate = DateTime.Today.AddMonths(6);
+    private string? _description;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isSaving = true;
+        try
+        {
+            var request = new CreateGoalRequest
+            {
+                Name = _name.Trim(),
+                TargetAmount = _targetAmount,
+                Currency = _currency,
+                Priority = _priority,
+                TargetDate = _targetDate,
+                Description = _description?.Trim()
+            };
+
+            await GoalService.CreateAsync(request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

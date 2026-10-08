@@ -1,0 +1,271 @@
+@page "/transactions"
+@inject ITransactionService TransactionService
+@inject IAccountService AccountService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IMediator Mediator
+@inject IJSRuntime JS
+@inject AppState AppState
+@using FinTrack.Application.Transactions.Queries
+@using FinTrack.Domain.Enums
+@using MediatR
+
+<PageTitle>Transacciones - FinTrack</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">📝 Transacciones</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Historial de ingresos, gastos y transferencias registradas
+        </MudText>
+    </div>
+    <MudStack Row="true" Spacing="2">
+        <MudMenu Label="Exportar"
+                 Variant="Variant.Outlined"
+                 Color="Color.Primary"
+                 StartIcon="@Icons.Material.Filled.Download"
+                 EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                 Dense="true"
+                 Disabled="@_isExporting">
+            <MudMenuItem Icon="@Icons.Custom.FileFormats.FileExcel"
+                         IconColor="Color.Success"
+                         OnClick="@(() => ExportData("xlsx"))">
+                Descargar Excel (.xlsx)
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Custom.FileFormats.FileDocument"
+                         IconColor="Color.Info"
+                         OnClick="@(() => ExportData("csv"))">
+                Descargar CSV (.csv)
+            </MudMenuItem>
+        </MudMenu>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
+            Nuevo Movimiento
+        </MudButton>
+    </MudStack>
+</MudStack>
+
+<!-- Filtros de Búsqueda -->
+<MudPaper Elevation="1" Class="pa-4 mb-6 rounded-lg">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="string" Label="Filtrar por Tipo" @bind-Value="_selectedType" SelectedValuesChanged="OnFilterChanged">
+                <MudSelectItem Value="@("")">Todos los Tipos</MudSelectItem>
+                <MudSelectItem Value="@("Income")">🟢 Solo Ingresos</MudSelectItem>
+                <MudSelectItem Value="@("Expense")">🔴 Solo Gastos</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="8">
+            <MudTextField @bind-Value="_searchString"
+                          Placeholder="Buscar por descripción o etiqueta..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          OnKeyUp="OnSearchKeyUp" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-6" />
+}
+else
+{
+    <MudTable Items="@_transactions"
+              Dense="true"
+              Hover="true"
+              Elevation="2"
+              Class="rounded-lg">
+        <HeaderContent>
+            <MudTh>Fecha</MudTh>
+            <MudTh>Cuenta</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Categoría</MudTh>
+            <MudTh>Descripción</MudTh>
+            <MudTh Style="text-align: right">Monto</MudTh>
+            <MudTh Style="text-align: right">Acción</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Fecha">
+                <MudText Typo="Typo.body2">@context.Date.ToLocalTime().ToString("dd/MM/yyyy")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Date.ToLocalTime().ToString("HH:mm")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Cuenta">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                    @context.AccountName
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Tipo">
+                @if (context.Type == "Income")
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Ingreso</MudChip>
+                }
+                else if (context.Type == "Expense")
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error">Gasto</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">Transferencia</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Categoría">
+                @if (!string.IsNullOrEmpty(context.CategoryName))
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                        @context.CategoryName
+                    </MudChip>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Sin categoría</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Descripción">
+                <MudText Typo="Typo.body2">@context.Description</MudText>
+                @if (!string.IsNullOrWhiteSpace(context.Tags))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">🏷️ @context.Tags</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Monto" Style="text-align: right">
+                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(context.Type == "Income" ? Color.Success : Color.Error)">
+                    @(context.Type == "Income" ? "+" : "-") @context.Currency @context.Amount.ToString("N2")
+                </MudText>
+            </MudTd>
+            <MudTd Style="text-align: right">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="() => DeleteTransaction(context)" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Align="Align.Center" Class="py-6">No se encontraron movimientos registrados.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 15, 30, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<TransactionDto> _transactions = new();
+    private bool _isLoading = true;
+    private string _selectedType = "";
+    private string _searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTransactions();
+    }
+
+    private async Task LoadTransactions()
+    {
+        _isLoading = true;
+        try
+        {
+            var paged = await TransactionService.GetAllAsync(
+                type: string.IsNullOrWhiteSpace(_selectedType) ? null : _selectedType,
+                search: string.IsNullOrWhiteSpace(_searchString) ? null : _searchString,
+                pageSize: 100);
+
+            _transactions = paged.Items.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar movimientos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnFilterChanged(IEnumerable<string> values)
+    {
+        await LoadTransactions();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadTransactions();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.TransactionDialog>("Nuevo Movimiento", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Transacción registrada correctamente", Severity.Success);
+            await LoadTransactions();
+        }
+    }
+
+    private async Task DeleteTransaction(TransactionDto transaction)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Eliminar Movimiento",
+            $"¿Deseas eliminar la transacción '{transaction.Description}' por {transaction.Currency} {transaction.Amount:N2}? El balance de la cuenta se ajustará automáticamente.",
+            yesText: "Eliminar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await TransactionService.DeleteAsync(transaction.Id);
+                Snackbar.Add("Transacción eliminada y balance revertido", Severity.Success);
+                await LoadTransactions();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private bool _isExporting = false;
+
+    private async Task ExportData(string format)
+    {
+        if (_isExporting) return;
+        _isExporting = true;
+        try
+        {
+            var query = new ExportTransactionsQuery(
+                Format: format,
+                Type: string.IsNullOrWhiteSpace(_selectedType) ? null : _selectedType,
+                Search: string.IsNullOrWhiteSpace(_searchString) ? null : _searchString,
+                Currency: AppState.DisplayCurrency
+            );
+
+            var result = await Mediator.Send(query);
+            if (result.IsSuccess && result.Value != null)
+            {
+                await JS.InvokeVoidAsync("downloadFileFromByteArray", result.Value.FileName, result.Value.ContentType, result.Value.Content);
+                Snackbar.Add($"Archivo {result.Value.FileName} generado exitosamente", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "Error al exportar transacciones", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error en la exportación: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+}

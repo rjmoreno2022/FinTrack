@@ -1,0 +1,117 @@
+@inject IDebtService DebtService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Class="mb-4">
+            <MudText Typo="Typo.subtitle1">
+                Registrar pago/abono para: <strong>@Debt.Creditor</strong>
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Monto pendiente: <strong>@Debt.Currency @Debt.RemainingAmount.ToString("N2")</strong>
+                (Total original: @Debt.Currency @Debt.OriginalAmount.ToString("N2"))
+            </MudText>
+        </MudStack>
+
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudNumericField T="decimal"
+                             Label="Monto a Abonar"
+                             @bind-Value="_amount"
+                             Min="0.01m"
+                             Max="@Debt.RemainingAmount"
+                             Required="true"
+                             RequiredError="El monto debe ser mayor a 0"
+                             Format="N2"
+                             Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                             Class="mb-3"
+                             AutoFocus="true" />
+
+            <MudDatePicker Label="Fecha del Abono"
+                           @bind-Date="_date"
+                           Required="true"
+                           Class="mb-3" />
+
+            <MudTextField T="string?"
+                          Label="Nota o Referencia (Opcional)"
+                          @bind-Value="_note"
+                          MaxLength="500" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Success"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving || _amount <= 0 || _amount > Debt.RemainingAmount)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Registrando...</span>
+            }
+            else
+            {
+                <span>Registrar Abono</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public DebtDto Debt { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private decimal _amount = 10m;
+    private DateTime? _date = DateTime.Today;
+    private string? _note;
+
+    protected override void OnInitialized()
+    {
+        if (Debt != null)
+        {
+            _amount = Math.Min(Debt.RemainingAmount, 50m);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        if (_amount > Debt.RemainingAmount)
+        {
+            Snackbar.Add($"El abono no puede exceder el monto pendiente de {Debt.Currency} {Debt.RemainingAmount:N2}", Severity.Warning);
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var request = new RegisterDebtPaymentRequest
+            {
+                Amount = _amount,
+                Date = _date ?? DateTime.UtcNow,
+                Note = _note?.Trim()
+            };
+
+            await DebtService.RegisterPaymentAsync(Debt.Id, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

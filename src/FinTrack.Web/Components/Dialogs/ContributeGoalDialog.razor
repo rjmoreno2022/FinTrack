@@ -1,0 +1,78 @@
+@inject IGoalService GoalService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Class="mb-4">
+            <MudText Typo="Typo.subtitle1">Abonar fondos a la meta: <strong>@Goal.Name</strong></MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Objetivo total: <strong>@Goal.Currency @Goal.TargetAmount.ToString("N2")</strong> | Restante: <strong>@Goal.Currency @Goal.RemainingAmount.ToString("N2")</strong>
+            </MudText>
+        </MudStack>
+
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudNumericField T="decimal"
+                             Label="Monto a Contribuir"
+                             @bind-Value="_amount"
+                             Min="0.01m"
+                             Required="true"
+                             RequiredError="El monto debe ser mayor a 0"
+                             Format="N2"
+                             Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                             AutoFocus="true" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Success"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving || _amount <= 0)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Registrando...</span>
+            }
+            else
+            {
+                <span>Aportar Fondos</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public GoalDto Goal { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+    private decimal _amount = 50m;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isSaving = true;
+        try
+        {
+            await GoalService.ContributeAsync(Goal.Id, _amount);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

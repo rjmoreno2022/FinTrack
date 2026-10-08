@@ -1,0 +1,305 @@
+@page "/debts"
+@inject IDebtService DebtService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Deudas y Pasivos - FinTrack</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">📉 Deudas y Pasivos</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Control de cuentas por pagar, préstamos, tarjetas y dinero por cobrar
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Nueva Deuda
+    </MudButton>
+</MudStack>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-6" />
+}
+else
+{
+    <!-- Tarjetas de Resumen KPI -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total por Pagar (Debo)</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Error" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="Color.Error">
+                        $@_debts.Where(d => d.Type == "Owed" && d.Status == "Active").Sum(d => d.RemainingAmount).ToString("N2")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total por Cobrar (Me Deben)</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="Color.Success">
+                        $@_debts.Where(d => d.Type == "Receivable" && d.Status == "Active").Sum(d => d.RemainingAmount).ToString("N2")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Deudas Saldadas / Pagadas</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Info" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        @_debts.Count(d => d.Status == "Paid")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Pestañas de Filtro -->
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4">
+        <MudTabPanel Text="Todas" OnClick='() => FilterTab("All")' />
+        <MudTabPanel Text="Por Pagar (Pasivos)" OnClick='() => FilterTab("Owed")' />
+        <MudTabPanel Text="Por Cobrar (Activos)" OnClick='() => FilterTab("Receivable")' />
+        <MudTabPanel Text="Saldadas" OnClick='() => FilterTab("Paid")' />
+    </MudTabs>
+
+    <!-- Tabla de Deudas -->
+    <MudTable Items="@FilteredDebts"
+              Dense="true"
+              Hover="true"
+              Elevation="2"
+              Class="rounded-lg">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Listado de Pasivos y Cuentas</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString"
+                          Placeholder="Buscar por acreedor/deudor..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Medium"
+                          Class="mt-0"
+                          Immediate="true" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Acreedor / Deudor</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Moneda</MudTh>
+            <MudTh>Monto Original</MudTh>
+            <MudTh>Pendiente</MudTh>
+            <MudTh Style="min-width: 130px;">Progreso Pagado</MudTh>
+            <MudTh>Vencimiento</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh Style="text-align: right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Acreedor">
+                <div>
+                    <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Creditor</MudText>
+                    @if (!string.IsNullOrEmpty(context.Description))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+                    }
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Tipo">
+                @if (context.Type == "Owed")
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">
+                        Debo
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                        Me Deben
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Moneda">
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
+                    @context.Currency
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Original">
+                @context.Currency @context.OriginalAmount.ToString("N2")
+            </MudTd>
+            <MudTd DataLabel="Pendiente">
+                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(context.RemainingAmount > 0 ? Color.Error : Color.Success)">
+                    @context.Currency @context.RemainingAmount.ToString("N2")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Progreso">
+                <div style="min-width: 100px;">
+                    <MudProgressLinear Color="Color.Success"
+                                       Value="@((double)context.ProgressPercentage)"
+                                       Rounded="true"
+                                       Size="Size.Small" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @context.ProgressPercentage.ToString("N0")% amortizado
+                    </MudText>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Vencimiento">
+                @(context.DueDate.HasValue ? context.DueDate.Value.ToString("dd/MM/yyyy") : "-")
+            </MudTd>
+            <MudTd DataLabel="Estado">
+                @if (context.Status == "Paid")
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Pagada</MudChip>
+                }
+                else if (context.Status == "Defaulted")
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error">En Mora</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">Activa</MudChip>
+                }
+            </MudTd>
+            <MudTd Style="text-align: right">
+                @if (context.Status == "Active")
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Payment"
+                               OnClick="() => OpenPaymentDialog(context)"
+                               Class="mr-2">
+                        Abonar
+                    </MudButton>
+                }
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Default"
+                               OnClick="() => DeleteDebt(context)" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Align="Align.Center" Class="py-4">No se encontraron deudas con este criterio.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<DebtDto> _debts = new();
+    private bool _isLoading = true;
+    private string _activeFilter = "All";
+    private string _searchString = string.Empty;
+
+    private IEnumerable<DebtDto> FilteredDebts
+    {
+        get
+        {
+            var result = _debts.AsEnumerable();
+
+            if (_activeFilter == "Owed")
+                result = result.Where(d => d.Type == "Owed" && d.Status == "Active");
+            else if (_activeFilter == "Receivable")
+                result = result.Where(d => d.Type == "Receivable" && d.Status == "Active");
+            else if (_activeFilter == "Paid")
+                result = result.Where(d => d.Status == "Paid");
+
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                result = result.Where(d =>
+                    d.Creditor.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                    (d.Description != null && d.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            return result;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDebts();
+    }
+
+    private async Task LoadDebts()
+    {
+        _isLoading = true;
+        try
+        {
+            _debts = await DebtService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar deudas: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void FilterTab(string filter)
+    {
+        _activeFilter = filter;
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.DebtDialog>("Nueva Deuda / Pasivo", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Registro de deuda creado exitosamente", Severity.Success);
+            await LoadDebts();
+        }
+    }
+
+    private async Task OpenPaymentDialog(DebtDto debt)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.DebtPaymentDialog> { { x => x.Debt, debt } };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.DebtPaymentDialog>("Registrar Abono", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("¡Abono registrado con éxito!", Severity.Success);
+            await LoadDebts();
+        }
+    }
+
+    private async Task DeleteDebt(DebtDto debt)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Eliminar Registro",
+            $"¿Deseas eliminar el registro '{debt.Creditor}'?",
+            yesText: "Eliminar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await DebtService.DeleteAsync(debt.Id);
+                Snackbar.Add("Registro eliminado", Severity.Success);
+                await LoadDebts();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error al eliminar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

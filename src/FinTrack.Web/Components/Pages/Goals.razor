@@ -1,0 +1,278 @@
+@page "/goals"
+@inject IGoalService GoalService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Metas de Ahorro - FinTrack</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">🎯 Metas de Ahorro</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Traza objetivos financieros, ahorra progresivamente y celebra tus logros
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Nueva Meta
+    </MudButton>
+</MudStack>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-6" />
+}
+else
+{
+    <!-- Tarjetas de Resumen KPI -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Metas en Progreso</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Flag" Color="Color.Info" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        @_goals.Count(g => g.Status == "Active")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Capital Acumulado en Metas</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Savings" Color="Color.Success" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="Color.Success">
+                        $@_goals.Sum(g => g.CurrentAmount).ToString("N2")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Metas Cumplidas 🎉</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Color="Color.Warning" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        @_goals.Count(g => g.Status == "Completed")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @if (!_goals.Any())
+    {
+        <MudCard Elevation="2" Class="rounded-lg pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Savings" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+            <MudText Typo="Typo.h6">No tienes metas de ahorro registradas</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                Crea tu primera meta financiera para fondos de emergencia, compras o viajes.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+                Crear Mi Primera Meta
+            </MudButton>
+        </MudCard>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var goal in _goals)
+            {
+                <MudItem xs="12" md="6" lg="4">
+                    <MudCard Elevation="3" Class="rounded-lg h-100 d-flex flex-column justify-space-between">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.h6" Class="font-weight-bold">@goal.Name</MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Default"
+                                                   OnClick="() => DeleteGoal(goal)" />
+                                </MudStack>
+                                <MudStack Row="true" Spacing="1" Class="mt-1">
+                                    <MudChip T="string" Size="Size.Small" Color="@GetPriorityColor(goal.Priority)" Variant="Variant.Outlined">
+                                        Prioridad @goal.Priority
+                                    </MudChip>
+                                    @if (goal.Status == "Completed")
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">
+                                            ¡Completada! 🎉
+                                        </MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
+                                            Activa
+                                        </MudChip>
+                                    }
+                                </MudStack>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+
+                        <MudCardContent>
+                            @if (!string.IsNullOrEmpty(goal.Description))
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                                    @goal.Description
+                                </MudText>
+                            }
+
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-1">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Progreso</MudText>
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">
+                                    @goal.Currency @goal.CurrentAmount.ToString("N2") de @goal.Currency @goal.TargetAmount.ToString("N2")
+                                </MudText>
+                            </MudStack>
+
+                            <MudProgressLinear Color="@(goal.Status == "Completed" ? Color.Success : Color.Primary)"
+                                               Value="@((double)goal.ProgressPercentage)"
+                                               Rounded="true"
+                                               Size="Size.Large"
+                                               Class="my-2" />
+
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @goal.ProgressPercentage.ToString("N1")% alcanzado
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @if (goal.Status == "Completed")
+                                    {
+                                        <span class="text-success font-weight-bold">¡Objetivo alcanzado!</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Faltan: @goal.Currency @goal.RemainingAmount.ToString("N2")</span>
+                                    }
+                                </MudText>
+                            </MudStack>
+
+                            @if (goal.TargetDate.HasValue)
+                            {
+                                <MudDivider Class="my-3" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    📅 Fecha estimada: @goal.TargetDate.Value.ToString("dd/MM/yyyy")
+                                </MudText>
+                            }
+                        </MudCardContent>
+
+                        <MudCardActions Class="pa-4">
+                            @if (goal.Status != "Completed")
+                            {
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Success"
+                                           FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.AddCard"
+                                           OnClick="() => OpenContributeDialog(goal)">
+                                    Aportar Dinero
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Success"
+                                           FullWidth="true"
+                                           Disabled="true"
+                                           StartIcon="@Icons.Material.Filled.CheckCircle">
+                                    Meta Lograda
+                                </MudButton>
+                            }
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+}
+
+@code {
+    private List<GoalDto> _goals = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGoals();
+    }
+
+    private async Task LoadGoals()
+    {
+        _isLoading = true;
+        try
+        {
+            _goals = await GoalService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar metas: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.GoalDialog>("Nueva Meta de Ahorro", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Meta creada exitosamente", Severity.Success);
+            await LoadGoals();
+        }
+    }
+
+    private async Task OpenContributeDialog(GoalDto goal)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.ContributeGoalDialog> { { x => x.Goal, goal } };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.ContributeGoalDialog>("Abonar a Meta", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("¡Aporte registrado correctamente!", Severity.Success);
+            await LoadGoals();
+        }
+    }
+
+    private async Task DeleteGoal(GoalDto goal)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Eliminar Meta",
+            $"¿Deseas eliminar la meta '{goal.Name}'?",
+            yesText: "Eliminar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await GoalService.DeleteAsync(goal.Id);
+                Snackbar.Add("Meta eliminada", Severity.Success);
+                await LoadGoals();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error al eliminar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetPriorityColor(string priority) => priority switch
+    {
+        "Critical" => Color.Error,
+        "High" => Color.Warning,
+        "Medium" => Color.Info,
+        _ => Color.Default
+    };
+}

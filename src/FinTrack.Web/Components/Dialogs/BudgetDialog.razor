@@ -1,0 +1,167 @@
+@inject IBudgetService BudgetService
+@inject ITransactionService TransactionService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField T="string"
+                          Label="Nombre del Presupuesto"
+                          @bind-Value="_name"
+                          Required="true"
+                          RequiredError="El nombre es obligatorio"
+                          Placeholder="ej. Gastos de Alimentación, Entretenimiento"
+                          MaxLength="100"
+                          Class="mb-3" />
+
+            <MudSelect T="Guid?"
+                       Label="Categoría (Opcional - Dejar vacío para presupuesto global)"
+                       @bind-Value="_categoryId"
+                       Clearable="true"
+                       Class="mb-3">
+                @foreach (var cat in _expenseCategories)
+                {
+                    <MudSelectItem Value="@((Guid?)cat.Id)">
+                        @cat.Name
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal"
+                                     Label="Límite Máximo"
+                                     @bind-Value="_limitAmount"
+                                     Min="1m"
+                                     Required="true"
+                                     RequiredError="El límite debe ser mayor a 0"
+                                     Format="N2"
+                                     Culture="@System.Globalization.CultureInfo.InvariantCulture" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string"
+                               Label="Moneda"
+                               @bind-Value="_currency"
+                               Required="true">
+                        <MudSelectItem Value="@("USD")">USD - Dólares</MudSelectItem>
+                        <MudSelectItem Value="@("VES")">VES - Bolívares</MudSelectItem>
+                        <MudSelectItem Value="@("USDT")">USDT - Tether</MudSelectItem>
+                        <MudSelectItem Value="@("EUR")">EUR - Euros</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudSelect T="string"
+                       Label="Período"
+                       @bind-Value="_period"
+                       Required="true"
+                       Class="mb-3">
+                <MudSelectItem Value="@("Monthly")">Mensual</MudSelectItem>
+                <MudSelectItem Value="@("Weekly")">Semanal</MudSelectItem>
+                <MudSelectItem Value="@("Annual")">Anual</MudSelectItem>
+                <MudSelectItem Value="@("Custom")">Personalizado</MudSelectItem>
+            </MudSelect>
+
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Fecha Inicio"
+                                   @bind-Date="_startDate"
+                                   Required="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Fecha Fin"
+                                   @bind-Date="_endDate"
+                                   Required="true" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Guardando...</span>
+            }
+            else
+            {
+                <span>Crear Presupuesto</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private List<CategoryDto> _expenseCategories = new();
+
+    private string _name = string.Empty;
+    private Guid? _categoryId;
+    private decimal _limitAmount = 100m;
+    private string _currency = "USD";
+    private string _period = "Monthly";
+    private DateTime? _startDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+    private DateTime? _endDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(1).AddDays(-1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allCats = await TransactionService.GetCategoriesAsync();
+        _expenseCategories = allCats.Where(c => c.Type.Equals("Expense", StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        if (_startDate == null || _endDate == null)
+        {
+            Snackbar.Add("Debe definir las fechas de inicio y fin", Severity.Warning);
+            return;
+        }
+
+        if (_startDate >= _endDate)
+        {
+            Snackbar.Add("La fecha de inicio debe ser anterior a la fecha de fin", Severity.Warning);
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var request = new CreateBudgetRequest
+            {
+                Name = _name.Trim(),
+                LimitAmount = _limitAmount,
+                Currency = _currency,
+                Period = _period,
+                StartDate = _startDate.Value,
+                EndDate = _endDate.Value,
+                CategoryId = _categoryId
+            };
+
+            await BudgetService.CreateAsync(request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

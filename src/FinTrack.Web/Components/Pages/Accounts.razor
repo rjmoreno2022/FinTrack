@@ -1,0 +1,245 @@
+@page "/accounts"
+@inject IAccountService AccountService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Cuentas - FinTrack</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">💳 Mis Cuentas</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Gestiona tus cuentas bancarias, billeteras, efectivo y criptomonedas
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Nueva Cuenta
+    </MudButton>
+</MudStack>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-6" />
+}
+else
+{
+    <!-- Tarjetas de Resumen por Tipo de Cuenta -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Cuentas Bancarias</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Info" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        @_accounts.Count(a => a.Type == "Bank")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Efectivo / Billeteras</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Success" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        @_accounts.Count(a => a.Type == "Cash" || a.Type == "Wallet")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Criptomonedas</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.CurrencyBitcoin" Color="Color.Warning" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        @_accounts.Count(a => a.Type == "Crypto")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Tabla de Cuentas -->
+    <MudTable Items="@_accounts"
+              Filter="new Func<AccountDto, bool>(FilterAccount)"
+              Dense="true"
+              Hover="true"
+              Elevation="2"
+              Class="rounded-lg">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Listado de Cuentas</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString"
+                          Placeholder="Buscar cuenta..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Medium"
+                          Class="mt-0"
+                          Immediate="true" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Nombre</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Moneda</MudTh>
+            <MudTh>Balance</MudTh>
+            <MudTh>Estado</MudTh>
+            <MudTh Style="text-align: right">Acciones</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nombre">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@GetAccountIcon(context.Type)" Size="Size.Small" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Name</MudText>
+                        @if (!string.IsNullOrEmpty(context.Description))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+                        }
+                    </div>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Tipo">@context.Type</MudTd>
+            <MudTd DataLabel="Moneda">
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                    @context.Currency
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Balance">
+                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(context.Balance >= 0 ? Color.Success : Color.Error)">
+                    @context.Currency @context.Balance.ToString("N2")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Estado">
+                @if (context.IsActive)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Activa</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default">Inactiva</MudChip>
+                }
+            </MudTd>
+            <MudTd Style="text-align: right">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               Color="Color.Primary"
+                               OnClick="() => OpenEditDialog(context)" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="() => DeleteAccount(context)" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Align="Align.Center" Class="py-4">No se encontraron cuentas registradas.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<AccountDto> _accounts = new();
+    private bool _isLoading = true;
+    private string _searchString = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAccounts();
+    }
+
+    private async Task LoadAccounts()
+    {
+        _isLoading = true;
+        try
+        {
+            _accounts = await AccountService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar cuentas: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool FilterAccount(AccountDto account)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString)) return true;
+        return account.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               (account.Description != null && account.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+               account.Type.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               account.Currency.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.AccountDialog>("Nueva Cuenta", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Cuenta creada exitosamente", Severity.Success);
+            await LoadAccounts();
+        }
+    }
+
+    private async Task OpenEditDialog(AccountDto account)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.AccountDialog> { { x => x.Account, account } };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.AccountDialog>("Editar Cuenta", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Cuenta actualizada correctamente", Severity.Success);
+            await LoadAccounts();
+        }
+    }
+
+    private async Task DeleteAccount(AccountDto account)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Confirmar Eliminación",
+            $"¿Estás seguro de que deseas desactivar la cuenta '{account.Name}'?",
+            yesText: "Desactivar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await AccountService.DeleteAsync(account.Id);
+                Snackbar.Add("Cuenta desactivada", Severity.Success);
+                await LoadAccounts();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error al desactivar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private string GetAccountIcon(string type) => type switch
+    {
+        "Bank" => Icons.Material.Filled.AccountBalance,
+        "Cash" => Icons.Material.Filled.Money,
+        "Crypto" => Icons.Material.Filled.CurrencyBitcoin,
+        "Wallet" => Icons.Material.Filled.Wallet,
+        _ => Icons.Material.Filled.AccountBalanceWallet
+    };
+}

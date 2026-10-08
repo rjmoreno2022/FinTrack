@@ -1,0 +1,349 @@
+﻿@page "/currencies"
+@inject IExchangeRateService ExchangeRateService
+@inject AppState AppState
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Divisas & Tasas Oficiales - FinTrack</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">💱 Divisas & Tasas Oficiales</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Cotizaciones oficiales certificadas por el Banco Central de Venezuela (BCV) y conversor multimoneda en vivo
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Sync"
+               Disabled="_isSyncingBcv"
+               OnClick="SyncBcvRatesAsync">
+        @if (_isSyncingBcv)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+            <span>Sincronizando con BCV...</span>
+        }
+        else
+        {
+            <span>🔄 Sincronizar Tasas Oficiales</span>
+        }
+    </MudButton>
+</MudStack>
+
+<!-- Sección 1: Tarjetas de Tasas Oficiales Activas -->
+<MudGrid Class="mb-6">
+    <!-- Dólar Oficial -->
+    <MudItem xs="12" sm="4">
+        <MudCard Elevation="3" Class="rounded-lg h-100 border-l-4 border-primary">
+            <MudCardContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">🇺🇸 Dólar Oficial BCV</MudText>
+                    <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">USD</MudChip>
+                </MudStack>
+                <MudText Typo="Typo.h4" Color="Color.Primary" Class="font-weight-bold my-2">
+                    Bs. @AppState.ExchangeRateUsdToVes.ToString("N2")
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    1 USD = Bs. @AppState.ExchangeRateUsdToVes.ToString("N4")
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Euro Oficial -->
+    <MudItem xs="12" sm="4">
+        <MudCard Elevation="3" Class="rounded-lg h-100 border-l-4 border-secondary">
+            <MudCardContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">🇪🇺 Euro Oficial BCV</MudText>
+                    <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Filled">EUR</MudChip>
+                </MudStack>
+                <MudText Typo="Typo.h4" Color="Color.Secondary" Class="font-weight-bold my-2">
+                    Bs. @AppState.ExchangeRateEurToVes.ToString("N2")
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    1 EUR = Bs. @AppState.ExchangeRateEurToVes.ToString("N4")
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Estado y Fuente -->
+    <MudItem xs="12" sm="4">
+        <MudCard Elevation="3" Class="rounded-lg h-100">
+            <MudCardContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">🏛️ Fuente Certificada</MudText>
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">Oficial</MudChip>
+                </MudStack>
+                <MudText Typo="Typo.body2" Class="font-weight-bold mt-2">
+                    Banco Central de Venezuela
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Última sincronización: @(AppState.LastRateSyncDate?.ToString("dd/MM/yyyy HH:mm") ?? "Activa")
+                </MudText>
+                <div class="mt-2">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Verified">
+                        Solo Lectura Certificada
+                    </MudChip>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Sección 2: Calculadora Multimoneda en Tiempo Real -->
+<MudCard Elevation="3" Class="rounded-lg mb-6">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.Calculate" Color="Color.Primary" Class="mr-2" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="font-weight-bold">Calculadora de Conversión Multimoneda</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Conversión instantánea entre USD, EUR y VES con las tasas certificadas del día
+                    </MudText>
+                </div>
+            </MudStack>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudGrid AlignItems="Center">
+            <!-- Monto Origen -->
+            <MudItem xs="12" sm="5">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudSelect T="string" Label="Moneda Origen" Value="_fromCurrency" ValueChanged="OnFromCurrencyChanged" Style="max-width: 120px;">
+                        <MudSelectItem Value="@("USD")">USD $</MudSelectItem>
+                        <MudSelectItem Value="@("EUR")">EUR €</MudSelectItem>
+                        <MudSelectItem Value="@("VES")">VES Bs.</MudSelectItem>
+                    </MudSelect>
+                    <MudNumericField T="decimal"
+                                     Label="Monto a Convertir"
+                                     Value="_sourceAmount"
+                                     ValueChanged="OnSourceAmountChanged"
+                                     Min="0m"
+                                     Format="N2"
+                                     Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                                     Immediate="true"
+                                     Class="flex-grow-1" />
+                </MudStack>
+            </MudItem>
+
+            <!-- Icono de Intercambio -->
+            <MudItem xs="12" sm="2" Class="d-flex justify-center">
+                <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               OnClick="InvertCurrencies" />
+            </MudItem>
+
+            <!-- Monto Destino (Resultado) -->
+            <MudItem xs="12" sm="5">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudSelect T="string" Label="Moneda Destino" Value="_toCurrency" ValueChanged="OnToCurrencyChanged" Style="max-width: 120px;">
+                        <MudSelectItem Value="@("VES")">VES Bs.</MudSelectItem>
+                        <MudSelectItem Value="@("USD")">USD $</MudSelectItem>
+                        <MudSelectItem Value="@("EUR")">EUR €</MudSelectItem>
+                    </MudSelect>
+                    <MudTextField T="string"
+                                  Label="Monto Equivalente"
+                                  Value="@_calculatedAmount.ToString("N2")"
+                                  ReadOnly="true"
+                                  Class="flex-grow-1 font-weight-bold" />
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-6" />
+}
+else
+{
+    <!-- Sección 3: Historial de Cotizaciones Oficiales -->
+    <MudTable Items="@_rates"
+              Dense="true"
+              Hover="true"
+              Elevation="2"
+              Class="rounded-lg">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Historial de Tasas Oficiales Sincronizadas</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchString"
+                          Placeholder="Buscar por moneda o fecha..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Medium"
+                          Class="mt-0"
+                          Immediate="true" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Fecha de Registro</MudTh>
+            <MudTh>Par Cambiario</MudTh>
+            <MudTh>Cotización Oficial</MudTh>
+            <MudTh>Fuente Certificada</MudTh>
+            <MudTh>Estado</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Fecha">
+                @context.Date.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+            </MudTd>
+            <MudTd DataLabel="Par">
+                <MudChip T="string" Size="Size.Small" Color="@(context.FromCurrency == "EUR" ? Color.Secondary : Color.Primary)" Variant="Variant.Outlined">
+                    @context.FromCurrency ➔ @context.ToCurrency
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Cotización">
+                <MudText Typo="Typo.body2" Class="font-weight-bold">
+                    Bs. @context.Rate.ToString("N2")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Fuente">
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.AccountBalance">
+                    @context.Source
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Estado">
+                @if (context.IsActive)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Activa</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">Histórica</MudChip>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Align="Align.Center" Class="py-4">No se registran tasas de cambio.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<ExchangeRateDto> _rates = new();
+    private bool _isLoading = true;
+    private string _searchString = string.Empty;
+    private bool _isSyncingBcv;
+
+    // Calculadora multimoneda
+    private string _fromCurrency = "USD";
+    private string _toCurrency = "VES";
+    private decimal _sourceAmount = 100m;
+    private decimal _calculatedAmount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Recalculate();
+        await LoadRates();
+    }
+
+    private async Task SyncBcvRatesAsync()
+    {
+        _isSyncingBcv = true;
+        try
+        {
+            var result = await ExchangeRateService.SyncOfficialRatesAsync();
+            if (result != null && result.UsdRate > 0 && result.EurRate > 0)
+            {
+                AppState.SetExchangeRates(result.UsdRate, result.EurRate, "BCV", result.EffectiveDate);
+                Recalculate();
+                await LoadRates();
+                Snackbar.Add($"Tasas oficiales BCV sincronizadas con éxito: USD Bs. {result.UsdRate:N2} | EUR Bs. {result.EurRate:N2}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("No se pudo obtener la cotización del BCV en este momento. Intenta de nuevo.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al sincronizar con el BCV: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSyncingBcv = false;
+        }
+    }
+
+    private async Task LoadRates()
+    {
+        _isLoading = true;
+        try
+        {
+            _rates = await ExchangeRateService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar tasas: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnSourceAmountChanged(decimal val)
+    {
+        _sourceAmount = val;
+        Recalculate();
+    }
+
+    private void OnFromCurrencyChanged(string val)
+    {
+        _fromCurrency = val;
+        Recalculate();
+    }
+
+    private void OnToCurrencyChanged(string val)
+    {
+        _toCurrency = val;
+        Recalculate();
+    }
+
+    private void InvertCurrencies()
+    {
+        var temp = _fromCurrency;
+        _fromCurrency = _toCurrency;
+        _toCurrency = temp;
+        Recalculate();
+    }
+
+    private void Recalculate()
+    {
+        if (_sourceAmount <= 0)
+        {
+            _calculatedAmount = 0;
+            return;
+        }
+
+        if (string.Equals(_fromCurrency, _toCurrency, StringComparison.OrdinalIgnoreCase))
+        {
+            _calculatedAmount = _sourceAmount;
+            return;
+        }
+
+        // 1. Convertir origen a VES
+        decimal amountInVes = _fromCurrency switch
+        {
+            "USD" => _sourceAmount * AppState.ExchangeRateUsdToVes,
+            "EUR" => _sourceAmount * AppState.ExchangeRateEurToVes,
+            "VES" => _sourceAmount,
+            _ => _sourceAmount
+        };
+
+        // 2. Convertir de VES a moneda destino
+        _calculatedAmount = _toCurrency switch
+        {
+            "VES" => amountInVes,
+            "USD" => AppState.ExchangeRateUsdToVes > 0 ? Math.Round(amountInVes / AppState.ExchangeRateUsdToVes, 2) : 0,
+            "EUR" => AppState.ExchangeRateEurToVes > 0 ? Math.Round(amountInVes / AppState.ExchangeRateEurToVes, 2) : 0,
+            _ => amountInVes
+        };
+    }
+}

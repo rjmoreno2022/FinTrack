@@ -1,0 +1,115 @@
+﻿@inject IExchangeRateService ExchangeRateService
+@inject AppState AppState
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mb-3">
+            <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Icon="@Icons.Material.Filled.Verified">
+                Cotizaciones oficiales certificadas por el Banco Central de Venezuela (BCV). Las tasas son de solo lectura y se actualizan automáticamente desde las APIs oficiales.
+            </MudAlert>
+
+            <MudGrid>
+                <!-- Tarjeta Dólar Oficial -->
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="2" Class="pa-4 rounded-lg d-flex flex-column align-center justify-center text-center">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-1">
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">🇺🇸 Dólar Oficial</MudText>
+                            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">USD</MudChip>
+                        </MudStack>
+                        <MudText Typo="Typo.h5" Color="Color.Primary" Class="font-weight-bold my-1">
+                            Bs. @AppState.ExchangeRateUsdToVes.ToString("N2")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            1 USD = Bs. @AppState.ExchangeRateUsdToVes.ToString("N4")
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Tarjeta Euro Oficial -->
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="2" Class="pa-4 rounded-lg d-flex flex-column align-center justify-center text-center">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-1">
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">🇪🇺 Euro Oficial</MudText>
+                            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Filled">EUR</MudChip>
+                        </MudStack>
+                        <MudText Typo="Typo.h5" Color="Color.Secondary" Class="font-weight-bold my-1">
+                            Bs. @AppState.ExchangeRateEurToVes.ToString("N2")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            1 EUR = Bs. @AppState.ExchangeRateEurToVes.ToString("N4")
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <MudPaper Outlined="true" Class="pa-3 rounded-lg mt-2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <div>
+                        <MudText Typo="Typo.caption" Class="font-weight-bold">Fuente Certificada:</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">🏛️ Banco Central de Venezuela (BCV)</MudText>
+                    </div>
+                    <div class="text-right">
+                        <MudText Typo="Typo.caption" Class="font-weight-bold">Última Sincronización:</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @(AppState.LastRateSyncDate?.ToString("dd/MM/yyyy HH:mm") ?? "Activa en sesión")
+                        </MudText>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cerrar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Sync"
+                   Disabled="_isSyncing"
+                   OnClick="SyncOfficialRatesAsync">
+            @if (_isSyncing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Sincronizando BCV...</span>
+            }
+            else
+            {
+                <span>Actualizar Tasas desde API</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private bool _isSyncing;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SyncOfficialRatesAsync()
+    {
+        _isSyncing = true;
+        try
+        {
+            var result = await ExchangeRateService.SyncOfficialRatesAsync();
+            if (result != null && result.UsdRate > 0 && result.EurRate > 0)
+            {
+                AppState.SetExchangeRates(result.UsdRate, result.EurRate, "BCV", result.EffectiveDate);
+                Snackbar.Add($"Tasas BCV actualizadas con éxito: USD Bs. {result.UsdRate:N2} | EUR Bs. {result.EurRate:N2}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("No se pudo obtener la cotización del BCV en este momento. Intenta de nuevo.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al sincronizar con el BCV: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
+}

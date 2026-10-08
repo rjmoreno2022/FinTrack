@@ -1,0 +1,140 @@
+@inject IDebtService DebtService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField T="string"
+                          Label="Acreedor / Deudor"
+                          @bind-Value="_creditor"
+                          Required="true"
+                          RequiredError="El nombre del acreedor o deudor es obligatorio"
+                          Placeholder="ej. Tarjeta Banesco, Cashea, Juan Pérez"
+                          MaxLength="150"
+                          Class="mb-3" />
+
+            <MudSelect T="string"
+                       Label="Tipo de Registro"
+                       @bind-Value="_type"
+                       Required="true"
+                       Class="mb-3">
+                <MudSelectItem Value="@("Owed")">🔴 Debo dinero (Pasivo / Deuda por pagar)</MudSelectItem>
+                <MudSelectItem Value="@("Receivable")">🟢 Me deben dinero (Cuenta por cobrar)</MudSelectItem>
+            </MudSelect>
+
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal"
+                                     Label="Monto Total Original"
+                                     @bind-Value="_originalAmount"
+                                     Min="1m"
+                                     Required="true"
+                                     RequiredError="El monto debe ser mayor a 0"
+                                     Format="N2"
+                                     Culture="@System.Globalization.CultureInfo.InvariantCulture" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string"
+                               Label="Moneda"
+                               @bind-Value="_currency"
+                               Required="true">
+                        <MudSelectItem Value="@("USD")">USD - Dólares</MudSelectItem>
+                        <MudSelectItem Value="@("VES")">VES - Bolívares</MudSelectItem>
+                        <MudSelectItem Value="@("USDT")">USDT - Tether</MudSelectItem>
+                        <MudSelectItem Value="@("EUR")">EUR - Euros</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal"
+                                     Label="Tasa de Interés (%)"
+                                     @bind-Value="_interestRate"
+                                     Min="0m"
+                                     Format="N2"
+                                     Culture="@System.Globalization.CultureInfo.InvariantCulture" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Fecha de Vencimiento (Opcional)"
+                                   @bind-Date="_dueDate"
+                                   Clearable="true" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTextField T="string?"
+                          Label="Descripción o Términos (Opcional)"
+                          @bind-Value="_description"
+                          Lines="2"
+                          MaxLength="500" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Guardando...</span>
+            }
+            else
+            {
+                <span>Crear Deuda</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private string _creditor = string.Empty;
+    private string _type = "Owed";
+    private decimal _originalAmount = 100m;
+    private string _currency = "USD";
+    private decimal _interestRate = 0m;
+    private DateTime? _dueDate = DateTime.Today.AddMonths(1);
+    private string? _description;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isSaving = true;
+        try
+        {
+            var request = new CreateDebtRequest
+            {
+                Creditor = _creditor.Trim(),
+                Type = _type,
+                OriginalAmount = _originalAmount,
+                Currency = _currency,
+                InterestRate = _interestRate,
+                DueDate = _dueDate,
+                Description = _description?.Trim()
+            };
+
+            await DebtService.CreateAsync(request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

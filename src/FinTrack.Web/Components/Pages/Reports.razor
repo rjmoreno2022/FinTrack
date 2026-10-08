@@ -1,0 +1,449 @@
+@page "/reports"
+@inject IReportService ReportService
+@inject ISnackbar Snackbar
+@inject IMediator Mediator
+@inject IJSRuntime JS
+@inject AppState AppState
+@using FinTrack.Application.Reports.Queries
+@using MediatR
+
+<PageTitle>Reportes & Analítica - FinTrack</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">📈 Reportes & Analítica Financiera</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Analiza el comportamiento histórico de tus ingresos, gastos y capacidad de ahorro
+        </MudText>
+    </div>
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+        <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
+            <MudButton Variant="@(_selectedPeriod == "CurrentMonth" ? Variant.Filled : Variant.Outlined)"
+                       OnClick='() => ChangePeriod("CurrentMonth")'>
+                Este Mes
+            </MudButton>
+            <MudButton Variant="@(_selectedPeriod == "Last3Months" ? Variant.Filled : Variant.Outlined)"
+                       OnClick='() => ChangePeriod("Last3Months")'>
+                Últimos 3 Meses
+            </MudButton>
+            <MudButton Variant="@(_selectedPeriod == "Last6Months" ? Variant.Filled : Variant.Outlined)"
+                       OnClick='() => ChangePeriod("Last6Months")'>
+                Últimos 6 Meses
+            </MudButton>
+            <MudButton Variant="@(_selectedPeriod == "CurrentYear" ? Variant.Filled : Variant.Outlined)"
+                       OnClick='() => ChangePeriod("CurrentYear")'>
+                Año Actual
+            </MudButton>
+        </MudButtonGroup>
+
+        <MudMenu Label="Exportar"
+                 Variant="Variant.Filled"
+                 Color="Color.Primary"
+                 StartIcon="@Icons.Material.Filled.Download"
+                 EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                 Dense="true"
+                 Disabled="@_isExporting">
+            <MudMenuItem Icon="@Icons.Custom.FileFormats.FilePdf"
+                         IconColor="Color.Error"
+                         OnClick="ExportPdfStatement">
+                Estado de Cuenta (PDF)
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Custom.FileFormats.FileExcel"
+                         IconColor="Color.Success"
+                         OnClick="ExportExcelReport">
+                Reporte Financiero (Excel)
+            </MudMenuItem>
+        </MudMenu>
+    </MudStack>
+</MudStack>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-6" />
+}
+else
+{
+    <!-- Tarjetas de Inteligencia Financiera -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total Gastado</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Error" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="Color.Error">
+                        $@_totalExpensesPeriod.ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        En @_periodLabel
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Promedio Gasto Diario</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Color="Color.Warning" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        $@_dailyAverageExpense.ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Por cada día del período
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Categoría Top de Gasto</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.PieChart" Color="Color.Primary" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold">
+                        @(_topCategory != null ? _topCategory.CategoryName : "N/A")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @(_topCategory != null ? $"${_topCategory.Amount:N2} ({_topCategory.Percentage}%)" : "Sin gastos")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Class="rounded-lg">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Superávit / Ahorro Neto</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Savings" Color="Color.Success" />
+                    </MudStack>
+                    <MudText Typo="Typo.h5" Class="mt-2 font-weight-bold" Color="@(_netSavingsPeriod >= 0 ? Color.Success : Color.Error)">
+                        $@_netSavingsPeriod.ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Ingresos menos Gastos
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Fila 1: Distribución por Categorías (Gráfico Donut y Tabla Desglosada) -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" md="5">
+            <MudCard Elevation="2" Class="rounded-lg h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">Desglose de Gastos</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Distribución gráfica por categoría</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="d-flex flex-column align-center justify-center py-4">
+                    @if (!_categoryExpenses.Any())
+                    {
+                        <div class="py-12 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.PieChartOutline" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">No hay gastos para este período.</MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Donut"
+                                  InputData="@_donutData"
+                                  InputLabels="@_donutLabels"
+                                  Width="320px"
+                                  Height="320px" />
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="7">
+            <MudCard Elevation="2" Class="rounded-lg h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">Tabla de Categorías</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Consumo absoluto y porcentaje de participación</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (!_categoryExpenses.Any())
+                    {
+                        <MudText Color="Color.Secondary" Align="Align.Center" Class="py-8">
+                            No se registran gastos en el rango temporal seleccionado.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudTable Items="@_categoryExpenses" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Categoría</MudTh>
+                                <MudTh>Monto</MudTh>
+                                <MudTh Style="min-width: 150px;">Participación</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Categoría">
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@context.CategoryName</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Monto">
+                                    <MudText Typo="Typo.body2" Color="Color.Error">
+                                        $@context.Amount.ToString("N2")
+                                    </MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Participación">
+                                    <MudProgressLinear Color="Color.Primary"
+                                                       Value="@((double)context.Percentage)"
+                                                       Rounded="true"
+                                                       Size="Size.Medium" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @context.Percentage.ToString("N1")%
+                                    </MudText>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Fila 2: Flujo de Caja Histórico Detallado -->
+    <MudCard Elevation="2" Class="rounded-lg mb-6">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">Historial de Flujo de Caja Mensual</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Comparativa de ingresos, egresos y ahorro neto mes a mes</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" lg="7">
+                    @if (!_monthlyCashFlow.Any(m => m.Income > 0 || m.Expense > 0))
+                    {
+                        <MudText Color="Color.Secondary" Align="Align.Center" Class="py-8">
+                            Sin datos suficientes para graficar el histórico.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudChart T="double"
+                                  ChartType="ChartType.Bar"
+                                  ChartSeries="@_barSeries"
+                                  XAxisLabels="@_barLabels"
+                                  Width="100%"
+                                  Height="320px" />
+                    }
+                </MudItem>
+                <MudItem xs="12" lg="5">
+                    <MudTable Items="@_monthlyCashFlow" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Mes</MudTh>
+                            <MudTh>Ingresos</MudTh>
+                            <MudTh>Gastos</MudTh>
+                            <MudTh>Ahorro Neto</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Mes">
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.MonthLabel</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Ingresos">
+                                <MudText Typo="Typo.body2" Color="Color.Success">+$@context.Income.ToString("N2")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Gastos">
+                                <MudText Typo="Typo.body2" Color="Color.Error">-$@context.Expense.ToString("N2")</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Ahorro Neto">
+                                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(context.NetSavings >= 0 ? Color.Success : Color.Error)">
+                                    @(context.NetSavings >= 0 ? "+" : "")@context.NetSavings.ToString("N2")
+                                </MudText>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string _selectedPeriod = "CurrentMonth";
+    private string _periodLabel = "el mes actual";
+
+    private List<CategoryExpenseReportDto> _categoryExpenses = new();
+    private List<MonthlyCashFlowDto> _monthlyCashFlow = new();
+
+    private decimal _totalExpensesPeriod;
+    private decimal _totalIncomePeriod;
+    private decimal _netSavingsPeriod;
+    private decimal _dailyAverageExpense;
+    private CategoryExpenseReportDto? _topCategory;
+
+    // Datos para MudChart
+    private double[] _donutData = Array.Empty<double>();
+    private string[] _donutLabels = Array.Empty<string>();
+    private List<ChartSeries<double>> _barSeries = new();
+    private string[] _barLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReportData();
+    }
+
+    private async Task ChangePeriod(string period)
+    {
+        _selectedPeriod = period;
+        await LoadReportData();
+    }
+
+    private async Task LoadReportData()
+    {
+        _isLoading = true;
+        try
+        {
+            var now = DateTime.UtcNow;
+            DateTime startDate;
+            DateTime endDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1).AddTicks(-1);
+            int monthsCount = 6;
+
+            switch (_selectedPeriod)
+            {
+                case "Last3Months":
+                    startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-2);
+                    _periodLabel = "los últimos 3 meses";
+                    monthsCount = 3;
+                    break;
+                case "Last6Months":
+                    startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-5);
+                    _periodLabel = "los últimos 6 meses";
+                    monthsCount = 6;
+                    break;
+                case "CurrentYear":
+                    startDate = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                    _periodLabel = $"el año {now.Year}";
+                    monthsCount = now.Month;
+                    break;
+                case "CurrentMonth":
+                default:
+                    startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                    _periodLabel = "el mes actual";
+                    monthsCount = 6;
+                    break;
+            }
+
+            _categoryExpenses = await ReportService.GetCategoryExpensesAsync(startDate, endDate);
+            _monthlyCashFlow = await ReportService.GetMonthlyCashFlowAsync(monthsCount);
+
+            _totalExpensesPeriod = _categoryExpenses.Sum(c => c.Amount);
+            _topCategory = _categoryExpenses.FirstOrDefault();
+
+            var daysInPeriod = Math.Max(1, (int)(endDate - startDate).TotalDays);
+            _dailyAverageExpense = _totalExpensesPeriod / daysInPeriod;
+
+            _totalIncomePeriod = _monthlyCashFlow.Sum(m => m.Income);
+            _netSavingsPeriod = _totalIncomePeriod - _totalExpensesPeriod;
+
+            // MudChart Donut
+            if (_categoryExpenses.Any())
+            {
+                _donutData = _categoryExpenses.Select(c => (double)c.Amount).ToArray();
+                _donutLabels = _categoryExpenses.Select(c => $"{c.CategoryName} ({c.Percentage:N0}%)").ToArray();
+            }
+            else
+            {
+                _donutData = Array.Empty<double>();
+                _donutLabels = Array.Empty<string>();
+            }
+
+            // MudChart Bar
+            if (_monthlyCashFlow.Any())
+            {
+                _barLabels = _monthlyCashFlow.Select(m => m.MonthLabel).ToArray();
+                _barSeries = new List<ChartSeries<double>>
+                {
+                    new ChartSeries<double> { Name = "Ingresos (+)", Data = _monthlyCashFlow.Select(m => (double)m.Income).ToArray() },
+                    new ChartSeries<double> { Name = "Gastos (-)", Data = _monthlyCashFlow.Select(m => (double)m.Expense).ToArray() }
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar reportes: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool _isExporting = false;
+
+    private async Task ExportPdfStatement()
+    {
+        if (_isExporting) return;
+        _isExporting = true;
+        try
+        {
+            var query = new ExportFinancialReportPdfQuery(
+                Period: _selectedPeriod,
+                Currency: AppState.DisplayCurrency
+            );
+            var result = await Mediator.Send(query);
+            if (result.IsSuccess && result.Value != null)
+            {
+                await JS.InvokeVoidAsync("downloadFileFromByteArray", result.Value.FileName, result.Value.ContentType, result.Value.Content);
+                Snackbar.Add($"Estado de cuenta {result.Value.FileName} generado exitosamente", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "Error al generar estado de cuenta PDF", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al exportar PDF: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    private async Task ExportExcelReport()
+    {
+        if (_isExporting) return;
+        _isExporting = true;
+        try
+        {
+            var query = new ExportFinancialReportExcelQuery(
+                Period: _selectedPeriod,
+                Currency: AppState.DisplayCurrency
+            );
+            var result = await Mediator.Send(query);
+            if (result.IsSuccess && result.Value != null)
+            {
+                await JS.InvokeVoidAsync("downloadFileFromByteArray", result.Value.FileName, result.Value.ContentType, result.Value.Content);
+                Snackbar.Add($"Reporte {result.Value.FileName} generado exitosamente", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? "Error al generar reporte Excel", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al exportar Excel: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+}

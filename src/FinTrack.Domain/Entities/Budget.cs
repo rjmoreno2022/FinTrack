@@ -8,7 +8,7 @@ namespace FinTrack.Domain.Entities;
 /// <summary>
 /// Representa un presupuesto definido para gastos por categoría o generales durante un período.
 /// </summary>
-public class Budget : Entity
+public class Budget : Entity, IAggregateRoot
 {
     public string Name { get; private set; }
     public Guid? CategoryId { get; private set; }

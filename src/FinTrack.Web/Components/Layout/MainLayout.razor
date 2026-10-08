@@ -1,23 +1,166 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AppState AppState
+@inject IDialogService DialogService
+@inject IServiceScopeFactory ScopeFactory
+@inject ISnackbar Snackbar
 
-<div class="page">
-    <div class="sidebar">
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Surface" Fixed="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h6" Class="ml-3 font-weight-bold" Color="Color.Primary">
+            💰 FinTrack
+        </MudText>
+
+        <MudSpacer />
+
+        <!-- Chip de Tasa de Cambio Activa -->
+        <MudChip T="string"
+                 Variant="Variant.Filled"
+                 Color="Color.Info"
+                 Size="Size.Small"
+                 Icon="@Icons.Material.Filled.CurrencyExchange"
+                 OnClick="OpenExchangeRateDialog"
+                 Class="mr-2 cursor-pointer">
+            USD: Bs. @AppState.ExchangeRateUsdToVes.ToString("N2") | EUR: Bs. @AppState.ExchangeRateEurToVes.ToString("N2")
+        </MudChip>
+
+        <!-- Toggle Moneda Global de Visualización -->
+        <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small" Class="mr-3">
+            <MudButton Variant="@(AppState.DisplayCurrency == "USD" ? Variant.Filled : Variant.Outlined)"
+                       OnClick='() => AppState.SetDisplayCurrency("USD")'>
+                USD $
+            </MudButton>
+            <MudButton Variant="@(AppState.DisplayCurrency == "EUR" ? Variant.Filled : Variant.Outlined)"
+                       OnClick='() => AppState.SetDisplayCurrency("EUR")'>
+                EUR €
+            </MudButton>
+            <MudButton Variant="@(AppState.DisplayCurrency == "VES" ? Variant.Filled : Variant.Outlined)"
+                       OnClick='() => AppState.SetDisplayCurrency("VES")'>
+                VES Bs.
+            </MudButton>
+        </MudButtonGroup>
+
+        <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit"
+                       OnClick="@ToggleTheme" />
+        <MudAvatar Color="Color.Primary" Size="Size.Small" Class="ml-2">FT</MudAvatar>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
         <NavMenu />
-    </div>
+    </MudDrawer>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6 pb-12">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    Ocurrió un error no esperado.
+    <a href="." class="reload">Recargar</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState.OnChange += StateHasChanged;
+
+        if (!AppState.IsRateLoaded)
+        {
+            try
+            {
+                using var scope = ScopeFactory.CreateScope();
+                var exchangeRateService = scope.ServiceProvider.GetRequiredService<IExchangeRateService>();
+                var latestUsd = await exchangeRateService.GetLatestRateAsync("USD", "VES");
+                var latestEur = await exchangeRateService.GetLatestRateAsync("EUR", "VES");
+
+                var usdRate = latestUsd != null && latestUsd.Rate > 0 ? latestUsd.Rate : AppState.ExchangeRateUsdToVes;
+                var eurRate = latestEur != null && latestEur.Rate > 0 ? latestEur.Rate : AppState.ExchangeRateEurToVes;
+                var source = latestUsd?.Source ?? "BCV";
+
+                AppState.SetExchangeRates(usdRate, eurRate, source, latestUsd?.Date);
+            }
+            catch
+            {
+                // Si la base de datos está vacía o aún no inicializada, usa la tasa por defecto de AppState
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+
+    private async Task OpenExchangeRateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.ExchangeRateDialog>("Tasa de Cambio", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            Snackbar.Add("Tasa de cambio actualizada", Severity.Success);
+        }
+    }
+
+    private void DrawerToggle() => _drawerOpen = !_drawerOpen;
+    private void ToggleTheme() => _isDarkMode = !_isDarkMode;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#238636",
+            Secondary = "#0969da",
+            AppbarBackground = "#ffffff",
+            AppbarText = "#24292f",
+            Background = "#f6f8fa",
+            Surface = "#ffffff",
+            TextPrimary = "#24292f",
+            TextSecondary = "#57606a",
+            ActionDefault = "#57606a",
+            DrawerBackground = "#ffffff",
+            DrawerText = "#24292f",
+            DrawerIcon = "#57606a",
+            Success = "#2da44e",
+            Error = "#cf222e",
+            Warning = "#bf8700",
+            Info = "#0969da"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#2ea043",
+            Secondary = "#58a6ff",
+            AppbarBackground = "#161b22",
+            AppbarText = "#c9d1d9",
+            Background = "#0d1117",
+            Surface = "#161b22",
+            TextPrimary = "#c9d1d9",
+            TextSecondary = "#8b949e",
+            ActionDefault = "#8b949e",
+            DrawerBackground = "#161b22",
+            DrawerText = "#c9d1d9",
+            DrawerIcon = "#8b949e",
+            Success = "#3fb950",
+            Error = "#f85149",
+            Warning = "#d29922",
+            Info = "#58a6ff"
+        }
+    };
+}

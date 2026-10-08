@@ -674,7 +674,7 @@
 <nav class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <h2>&#128176; FinTrack</h2>
-        <p>Guia de Desarrollo v1.0</p>
+        <p>Guia de Desarrollo v1.1</p>
     </div>
     <ul class="nav-list">
         <li class="nav-section">Navegacion</li>
@@ -722,8 +722,8 @@
         <h1>FinTrack - Guia de Desarrollo</h1>
         <p class="subtitle">Documentacion tecnica paso a paso para la construccion de la aplicacion de finanzas personales multi-moneda</p>
         <div class="hero-meta">
-            <span><strong>Version:</strong> 1.0</span>
-            <span><strong>Fecha:</strong> Julio 2026</span>
+            <span><strong>Version:</strong> 1.1</span>
+            <span><strong>Fecha:</strong> Octubre 2026</span>
             <span><strong>Autor:</strong> Arquitecto de Software</span>
         </div>
         <div class="badges">
@@ -923,6 +923,11 @@
         <li>En fases posteriores se puede migrar a Blazor Auto o WASM con APIs.</li>
     </ul>
 
+    <div class="callout callout-info">
+        <span class="callout-icon">&#8505;</span>
+        <p><strong>Precision (revision v1.1):</strong> La implementacion actual mantiene <strong>frontend Blazor y controllers de API en el mismo proyecto</strong>. Esto es un <em>monolito modular</em>, una decision arquitectonica valida y recomendada para el MVP: un solo despliegue, un solo contenedor, menor complejidad operativa. Gracias a Clean Architecture, si en el futuro se necesita separar la API, la logica de negocio no cambia. No es un atajo: es la arquitectura correcta para esta etapa.</p>
+    </div>
+
     <h4>MediatR + CQRS</h4>
     <p>CQRS separa operaciones de lectura (Queries) de escritura (Commands), permitiendo optimizar cada una por separado. MediatR facilita la comunicacion entre capas sin dependencias directas, promoviendo el desacoplamiento y haciendo el codigo mas testeable.</p>
 
@@ -935,6 +940,11 @@
     <div class="callout callout-warning">
         <span class="callout-icon">&#9888;</span>
         <p><strong>Nota sobre la version de MudBlazor:</strong> Asegurate de usar MudBlazor 6.x o superior compatible con .NET 8. Si usas .NET 8, verifica la compatibilidad en la documentacion oficial antes de instalar.</p>
+    </div>
+
+    <div class="callout callout-warning">
+        <span class="callout-icon">&#9888;</span>
+        <p><strong>Nota sobre .NET 8 (revision v1.1):</strong> El soporte LTS de .NET 8 finaliza en <strong>noviembre de 2026</strong>. Planifica la migracion a <strong>.NET 10 (LTS)</strong> apenas sea posible: el cambio suele ser directo (actualizar <code>TargetFramework</code>, imagenes base del Dockerfile y paquetes NuGet). Documentar esa migracion es ademas una excelente historia para entrevistas tecnicas.</p>
     </div>
 </section>
 
@@ -4391,10 +4401,16 @@ app.<span class="func">UseAuthorization</span>();</code></pre>
 <span class="kw">EXPOSE</span> 8080
 <span class="kw">EXPOSE</span> 8081
 
-<span class="kw">HEALTHCHECK</span> --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+<span class="comment"># NOTA: la imagen dotnet/aspnet:8.0 NO incluye curl ni wget.</span>
+<span class="comment"># El health check se configura en el orquestador (Container Apps / App Service),</span>
+<span class="comment"># apuntando al endpoint /health expuesto por la app.</span>
 
 <span class="kw">ENTRYPOINT</span> [<span class="str">"dotnet"</span>, <span class="str">"FinTrack.Web.dll"</span>]</code></pre>
+
+    <div class="callout callout-danger">
+        <span class="callout-icon">&#10060;</span>
+        <p><strong>Correccion (revision v1.1):</strong> El HEALTHCHECK original usaba <code>curl</code>, pero la imagen base <code>mcr.microsoft.com/dotnet/aspnet:8.0</code> no lo incluye, por lo que el contenedor siempre se marcaba como <em>unhealthy</em>. La practica recomendada es dejar los health probes al orquestador: Azure Container Apps y App Service permiten configurar <em>liveness</em> y <em>readiness probes</em> contra el endpoint <code>/health</code> sin instalar nada en la imagen.</p>
+    </div>
 
     <h3>docker-compose.yml</h3>
     <div class="code-header"><span>docker-compose.yml</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
@@ -4466,13 +4482,13 @@ app.<span class="func">UseAuthorization</span>();</code></pre>
           <span class="kw">dotnet-version</span>: ${{ env.DOTNET_VERSION }}
 
       - <span class="kw">name</span>: <span class="str">Restore</span>
-        <span class="kw">run</span>: dotnet restore src/FinTrack.sln
+        <span class="kw">run</span>: dotnet restore FinTrack.sln
 
       - <span class="kw">name</span>: <span class="str">Build</span>
-        <span class="kw">run</span>: dotnet build src/FinTrack.sln --configuration Release --no-restore
+        <span class="kw">run</span>: dotnet build FinTrack.sln --configuration Release --no-restore
 
       - <span class="kw">name</span>: <span class="str">Test</span>
-        <span class="kw">run</span>: dotnet test src/FinTrack.sln --no-build --verbosity normal
+        <span class="kw">run</span>: dotnet test FinTrack.sln --no-build --verbosity normal
 
       - <span class="kw">name</span>: <span class="str">Publish</span>
         <span class="kw">if</span>: github.ref == 'refs/heads/main'
@@ -4506,10 +4522,49 @@ app.<span class="func">UseAuthorization</span>();</code></pre>
     <span class="kw">if</span>: github.ref == 'refs/heads/main'
     <span class="kw">environment</span>: production
     <span class="kw">steps</span>:
-      - <span class="kw">name</span>: <span class="str">Deploy to Azure</span>
+      - <span class="kw">name</span>: <span class="str">Azure Login</span>
+        <span class="kw">uses</span>: azure/login@v2
+        <span class="kw">with</span>:
+          <span class="kw">creds</span>: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - <span class="kw">name</span>: <span class="str">Push image to Azure Container Registry</span>
         <span class="kw">run</span>: |
-          echo "Deploy to Azure App Service..."
-          <span class="comment"># az webapp deployment source config-zip ...</span></code></pre>
+          az acr login --name fintrackacr
+          docker tag fintrack:${{ github.sha }} fintrackacr.azurecr.io/fintrack:${{ github.sha }}
+          docker push fintrackacr.azurecr.io/fintrack:${{ github.sha }}
+
+      - <span class="kw">name</span>: <span class="str">Deploy to Azure Container Apps</span>
+        <span class="kw">run</span>: |
+          az containerapp update \
+            --name fintrack \
+            --resource-group fintrack-rg \
+            --image fintrackacr.azurecr.io/fintrack:${{ github.sha }}</code></pre>
+
+    <div class="callout callout-success">
+        <span class="callout-icon">&#9989;</span>
+        <p><strong>Correccion (revision v1.1):</strong> El paso de deploy original era solo un <code>echo</code> (stub). La version actualizada despliega de verdad a <strong>Azure Container Apps</strong>, la opcion recomendada para FinTrack: serverless, escala a cero cuando no hay trafico (costo casi nulo), y ejecuta contenedores de forma nativa sin gestionar servidores. Requiere crear antes el recurso con <code>az containerapp create</code> (o mejor: con Terraform/Bicep, ver abajo).</p>
+    </div>
+
+    <h3>Infraestructura como Codigo (Terraform / Bicep)</h3>
+    <p>Toda la infraestructura de Azure de FinTrack debe definirse como codigo. Esto permite recrear el entorno completo con un solo comando, versionar la infra junto al codigo, y es una de las habilidades mas demandadas en roles DevOps/Cloud.</p>
+    <ul>
+        <li><strong>Bicep:</strong> lenguaje nativo de Azure, sintaxis limpia, integracion total con ARM. Buen diferenciador en empresas que usan Azure.</li>
+        <li><strong>Terraform:</strong> estandar de la industria multi-cloud. Recomendado si buscas empleo internacional.</li>
+    </ul>
+    <p>Recursos a definir como codigo para FinTrack:</p>
+    <ul>
+        <li>Resource Group (<code>fintrack-rg</code>)</li>
+        <li>Azure Container Registry (ACR) para las imagenes Docker</li>
+        <li>Container Apps Environment + Container App (con probes a <code>/health</code>)</li>
+        <li>Base de datos: <strong>Azure SQL Database free tier</strong> (10 GB gratis mensuales) o una alternativa economica; evita SQL Server en VM por costo</li>
+        <li>Key Vault para secretos (connection strings, claves)</li>
+        <li>Application Insights para observabilidad</li>
+    </ul>
+
+    <div class="callout callout-tip">
+        <span class="callout-icon">&#128161;</span>
+        <p><strong>Entregable sugerido:</strong> destruir todo el entorno con <code>terraform destroy</code> y recrearlo con <code>terraform apply</code> + el pipeline de GitHub Actions, sin tocar el portal de Azure. Esa demo, documentada en el README, es exactamente lo que un entrevistador DevOps quiere ver.</p>
+    </div>
 
     <h3>Health Checks</h3>
     <div class="code-header"><span>Web/Program.cs - Health Checks</span><button class="copy-btn" onclick="copyCode(this)">Copiar</button></div>
@@ -4540,6 +4595,11 @@ app.<span class="func">MapHealthChecks</span>(<span class="str">"/health"</span>
         <span class="kw">await</span> context.Response.<span class="func">WriteAsJsonAsync</span>(response);
     }
 });</code></pre>
+
+    <div class="callout callout-warning">
+        <span class="callout-icon">&#9888;</span>
+        <p><strong>Correccion (revision v1.1):</strong> Blazor Server con ASP.NET Core Identity usa <strong>autenticacion por cookies</strong>, no JWT. Las variables <code>JwtSettings__*</code> solo aplican si se expone una API REST para clientes externos (por ejemplo, una futura app movil o Blazor WASM). Mientras FinTrack sea un monolito Blazor Server, estas variables pueden eliminarse para no generar confusion. Ademas, recuerda que los secretos reales (connection strings, claves) deben vivir en <strong>Azure Key Vault</strong> o en los secretos de GitHub Actions, nunca en el repositorio.</p>
+    </div>
 
     <h3>Variables de Entorno</h3>
     <table>
@@ -4611,9 +4671,9 @@ app.<span class="func">MapHealthChecks</span>(<span class="str">"/health"</span>
             <tr><th>Comando</th><th>Descripcion</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>dotnet build src/FinTrack.sln</code></td><td>Compilar solution</td></tr>
+            <tr><td><code>dotnet build FinTrack.sln</code></td><td>Compilar solution</td></tr>
             <tr><td><code>dotnet build --configuration Release</code></td><td>Compilar en Release</td></tr>
-            <tr><td><code>dotnet test src/FinTrack.sln</code></td><td>Ejecutar todos los tests</td></tr>
+            <tr><td><code>dotnet test FinTrack.sln</code></td><td>Ejecutar todos los tests</td></tr>
             <tr><td><code>dotnet test --verbosity normal</code></td><td>Tests con detalle</td></tr>
             <tr><td><code>dotnet test /p:CollectCoverage=true</code></td><td>Tests con code coverage</td></tr>
             <tr><td><code>dotnet publish src/Web -c Release -o ./publish</code></td><td>Publicar app</td></tr>
@@ -4853,7 +4913,7 @@ app.<span class="func">MapHealthChecks</span>(<span class="str">"/health"</span>
         <p style="font-size: 3rem; margin-bottom: 16px;">&#128176;</p>
         <h2 style="border: none; color: var(--accent);">FinTrack</h2>
         <p style="color: var(--text-secondary); font-size: 1.1rem;">
-            Guia de Desarrollo v1.0 &mdash; Julio 2026
+            Guia de Desarrollo v1.1 &mdash; Julio 2026
         </p>
         <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 16px;">
             Documentacion tecnica generada como guia definitiva para la construccion<br>

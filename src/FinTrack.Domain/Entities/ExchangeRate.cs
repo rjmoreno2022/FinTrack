@@ -8,7 +8,7 @@ namespace FinTrack.Domain.Entities;
 /// <summary>
 /// Registra el tipo de cambio entre dos monedas en una fecha y fuente específicas.
 /// </summary>
-public class ExchangeRate : Entity
+public class ExchangeRate : Entity, IAggregateRoot
 {
     public Currency FromCurrency { get; private set; }
     public Currency ToCurrency { get; private set; }

@@ -9,7 +9,7 @@ namespace FinTrack.Domain.Entities;
 /// <summary>
 /// Representa una categoría jerárquica para clasificar ingresos o gastos.
 /// </summary>
-public class Category : Entity
+public class Category : Entity, IAggregateRoot
 {
     public string Name { get; private set; }
     public CategoryType Type { get; private set; }
@@ -28,6 +28,21 @@ public class Category : Entity
     }
 
     public Category(string name, CategoryType type, string? icon = null, string? color = null, Guid? parentCategoryId = null, bool isSystem = false)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("El nombre de la categoría es requerido");
+
+        Name = name;
+        Type = type;
+        Icon = icon;
+        Color = color;
+        ParentCategoryId = parentCategoryId;
+        IsSystem = isSystem;
+        SubCategories = new List<Category>();
+    }
+
+    public Category(Guid id, string name, CategoryType type, string? icon = null, string? color = null, Guid? parentCategoryId = null, bool isSystem = false, DateTime? createdAt = null)
+        : base(id, createdAt ?? new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc))
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("El nombre de la categoría es requerido");

@@ -22,6 +22,12 @@ public abstract class Entity
         CreatedAt = DateTime.UtcNow;
     }
 
+    protected Entity(Guid id, DateTime createdAt)
+    {
+        Id = id;
+        CreatedAt = createdAt;
+    }
+
     protected void AddDomainEvent(DomainEvent eventItem)
     {
         _domainEvents.Add(eventItem);

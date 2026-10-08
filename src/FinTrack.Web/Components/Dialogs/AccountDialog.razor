@@ -1,0 +1,136 @@
+@inject IAccountService AccountService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField T="string"
+                          Label="Nombre de la Cuenta"
+                          @bind-Value="_name"
+                          Required="true"
+                          RequiredError="El nombre es obligatorio"
+                          MaxLength="100"
+                          Class="mb-3" />
+
+            @if (Account == null)
+            {
+                <MudSelect T="string"
+                           Label="Tipo de Cuenta"
+                           @bind-Value="_type"
+                           Required="true"
+                           Class="mb-3">
+                    <MudSelectItem Value="@("Bank")">Banco</MudSelectItem>
+                    <MudSelectItem Value="@("Cash")">Efectivo</MudSelectItem>
+                    <MudSelectItem Value="@("Crypto")">Criptomoneda</MudSelectItem>
+                    <MudSelectItem Value="@("Wallet")">Billetera Digital</MudSelectItem>
+                    <MudSelectItem Value="@("Savings")">Ahorros</MudSelectItem>
+                </MudSelect>
+
+                <MudSelect T="string"
+                           Label="Moneda"
+                           @bind-Value="_currency"
+                           Required="true"
+                           Class="mb-3">
+                    <MudSelectItem Value="@("USD")">USD - Dólares</MudSelectItem>
+                    <MudSelectItem Value="@("VES")">VES - Bolívares</MudSelectItem>
+                    <MudSelectItem Value="@("USDT")">USDT - Tether</MudSelectItem>
+                    <MudSelectItem Value="@("EUR")">EUR - Euros</MudSelectItem>
+                </MudSelect>
+            }
+
+            <MudTextField T="string?"
+                          Label="Descripción (Opcional)"
+                          @bind-Value="_description"
+                          Lines="2"
+                          MaxLength="500" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!_isValid || _isSaving)"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Guardando...</span>
+            }
+            else
+            {
+                <span>Guardar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public AccountDto? Account { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private string _name = string.Empty;
+    private string _type = "Bank";
+    private string _currency = "USD";
+    private string? _description;
+
+    protected override void OnInitialized()
+    {
+        if (Account != null)
+        {
+            _name = Account.Name;
+            _type = Account.Type;
+            _currency = Account.Currency;
+            _description = Account.Description;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isSaving = true;
+        try
+        {
+            if (Account == null)
+            {
+                var request = new CreateAccountRequest
+                {
+                    Name = _name.Trim(),
+                    Type = _type,
+                    Currency = _currency,
+                    Description = _description?.Trim()
+                };
+                await AccountService.CreateAsync(request);
+            }
+            else
+            {
+                var request = new UpdateAccountRequest
+                {
+                    Name = _name.Trim(),
+                    Description = _description?.Trim()
+                };
+                await AccountService.UpdateAsync(Account.Id, request);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}
