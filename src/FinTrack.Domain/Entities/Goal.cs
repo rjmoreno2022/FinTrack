@@ -77,6 +77,29 @@ public class Goal : Entity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void Update(string name, decimal targetAmount, DateTime? targetDate = null, string? description = null, GoalPriority priority = GoalPriority.Medium)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("El nombre de la meta es requerido");
+        if (targetAmount <= 0)
+            throw new DomainException("El monto objetivo debe ser mayor a cero");
+        if (targetAmount < CurrentAmount)
+            throw new DomainException("El monto objetivo no puede ser menor al monto ahorrado actual");
+
+        Name = name;
+        TargetAmount = targetAmount;
+        TargetDate = targetDate;
+        Description = description;
+        Priority = priority;
+
+        if (CurrentAmount >= TargetAmount && Status == GoalStatus.Active)
+            Status = GoalStatus.Completed;
+        else if (CurrentAmount < TargetAmount && Status == GoalStatus.Completed)
+            Status = GoalStatus.Active;
+
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public decimal ProgressPercentage =>
         TargetAmount > 0 ? (CurrentAmount / TargetAmount) * 100 : 0;
 

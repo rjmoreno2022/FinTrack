@@ -78,6 +78,23 @@ public class Budget : Entity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void Update(string name, decimal limitAmount, Guid? categoryId, DateTime startDate, DateTime endDate)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("El nombre del presupuesto es requerido");
+        if (limitAmount <= 0)
+            throw new DomainException("El límite debe ser mayor a cero");
+        if (startDate >= endDate)
+            throw new DomainException("La fecha de inicio debe ser anterior a la fecha de fin");
+
+        Name = name;
+        LimitAmount = limitAmount;
+        CategoryId = categoryId;
+        StartDate = startDate;
+        EndDate = endDate;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void Deactivate()
     {
         IsActive = false;

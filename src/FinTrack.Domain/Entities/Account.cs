@@ -77,6 +77,16 @@ public class Account : Entity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void UpdateTransaction(Guid transactionId, string description, DateTime date, Guid? categoryId = null, string? tags = null)
+    {
+        var transaction = Transactions.FirstOrDefault(t => t.Id == transactionId);
+        if (transaction == null)
+            throw new DomainException("Transacción no encontrada en esta cuenta");
+
+        transaction.Update(description, date, categoryId, tags);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void UpdateInfo(string name, string? description)
     {
         if (string.IsNullOrWhiteSpace(name))

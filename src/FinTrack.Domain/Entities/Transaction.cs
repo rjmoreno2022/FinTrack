@@ -51,16 +51,21 @@ public class Transaction : Entity
         IsRecurring = isRecurring;
     }
 
-    public void Update(string description, Guid? categoryId, string? tags)
+    public void Update(string description, DateTime date, Guid? categoryId, string? tags)
     {
         if (string.IsNullOrWhiteSpace(description))
             throw new DomainException("La descripción es requerida");
 
         Description = description;
+        Date = date;
         CategoryId = categoryId;
         Tags = tags;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void Update(string description, Guid? categoryId, string? tags)
+        => Update(description, Date, categoryId, tags);
+
 
     public void SetTransferInfo(Guid transferAccountId, Guid relatedTransactionId)
     {

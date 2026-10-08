@@ -71,6 +71,20 @@ public class Debt : Entity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void Update(string creditor, string? description = null, DateTime? dueDate = null, decimal interestRate = 0)
+    {
+        if (string.IsNullOrWhiteSpace(creditor))
+            throw new DomainException("El acreedor es requerido");
+        if (interestRate < 0)
+            throw new DomainException("La tasa de interés no puede ser negativa");
+
+        Creditor = creditor;
+        Description = description;
+        DueDate = dueDate;
+        InterestRate = interestRate;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void MarkAsDefaulted()
     {
         if (Status == DebtStatus.Paid)

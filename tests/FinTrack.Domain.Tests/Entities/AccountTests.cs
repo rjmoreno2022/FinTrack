@@ -149,4 +149,18 @@ public class AccountTests
         act.Should().Throw<DomainException>()
            .WithMessage("El nombre de la cuenta es requerido");
     }
+
+    [Fact]
+    public void UpdateTransaction_WithValidParameters_ShouldUpdateTransaction()
+    {
+        var account = new Account("Test", AccountType.Bank, Currency.USD);
+        var tx = account.AddTransaction(TransactionType.Expense, 50m, "Original", DateTime.UtcNow);
+
+        var newDate = DateTime.UtcNow.AddDays(1);
+        account.UpdateTransaction(tx.Id, "Actualizado", newDate, null, "tag1");
+
+        tx.Description.Should().Be("Actualizado");
+        tx.Date.Should().Be(newDate);
+        tx.Tags.Should().Be("tag1");
+    }
 }
