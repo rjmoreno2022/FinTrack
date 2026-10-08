@@ -14,3 +14,19 @@ public class CategoryDto
     public bool IsSystem { get; set; }
     public List<CategoryDto> SubCategories { get; set; } = new();
 }
+
+public class CreateCategoryRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string Type { get; set; } = "Expense";
+    public string? Icon { get; set; }
+    public string? Color { get; set; }
+}
+
+public class UpdateCategoryRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Icon { get; set; }
+    public string? Color { get; set; }
+}
+

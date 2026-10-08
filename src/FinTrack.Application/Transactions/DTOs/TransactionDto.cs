@@ -33,3 +33,12 @@ public class CreateTransactionRequest
     public bool IsRecurring { get; set; }
     public Guid? TransferAccountId { get; set; }
 }
+
+public class UpdateTransactionRequest
+{
+    public string Description { get; set; } = string.Empty;
+    public DateTime Date { get; set; } = DateTime.UtcNow;
+    public Guid? CategoryId { get; set; }
+    public string? Tags { get; set; }
+}
+
