@@ -1,0 +1,87 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="auth-layout-container" style="min-height: 100vh; background-color: var(--mud-palette-background); display: flex; flex-direction: column;">
+    <header class="d-flex justify-space-between align-center px-6 py-3" style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+        <div class="d-flex align-center gap-2">
+            <MudAvatar Color="Color.Primary" Size="Size.Medium">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Medium" />
+            </MudAvatar>
+            <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">
+                FinTrack
+            </MudText>
+        </div>
+        <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit"
+                       OnClick="@ToggleTheme"
+                       Title="Cambiar tema" />
+    </header>
+
+    <main class="flex-grow-1 d-flex align-center justify-center pa-4">
+        @Body
+    </main>
+
+    <footer class="text-center py-3" style="border-top: 1px solid var(--mud-palette-lines-default);">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            FinTrack &copy; 2026 &bull; Control Financiero Personal Multi-divisa
+        </MudText>
+    </footer>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ocurrió un error no esperado.
+    <a href="." class="reload">Recargar</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool _isDarkMode = true;
+
+    private void ToggleTheme() => _isDarkMode = !_isDarkMode;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#238636",
+            Secondary = "#0969da",
+            AppbarBackground = "#ffffff",
+            AppbarText = "#24292f",
+            Background = "#f6f8fa",
+            Surface = "#ffffff",
+            TextPrimary = "#24292f",
+            TextSecondary = "#57606a",
+            ActionDefault = "#57606a",
+            DrawerBackground = "#ffffff",
+            DrawerText = "#24292f",
+            DrawerIcon = "#57606a",
+            Success = "#2da44e",
+            Error = "#cf222e",
+            Warning = "#bf8700",
+            Info = "#0969da"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#2ea043",
+            Secondary = "#58a6ff",
+            AppbarBackground = "#161b22",
+            AppbarText = "#c9d1d9",
+            Background = "#0d1117",
+            Surface = "#161b22",
+            TextPrimary = "#c9d1d9",
+            TextSecondary = "#8b949e",
+            ActionDefault = "#8b949e",
+            DrawerBackground = "#161b22",
+            DrawerText = "#c9d1d9",
+            DrawerIcon = "#8b949e",
+            Success = "#3fb950",
+            Error = "#f85149",
+            Warning = "#d29922",
+            Info = "#58a6ff"
+        }
+    };
+}
