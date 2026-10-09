@@ -10,8 +10,9 @@ namespace FinTrack.Domain.Entities;
 /// <summary>
 /// Cuenta financiera del usuario (Banco, Efectivo, Binance, etc.) que actúa como raíz del agregado.
 /// </summary>
-public class Account : Entity, IAggregateRoot
+public class Account : Entity, IAggregateRoot, IUserOwned
 {
+    public Guid UserId { get; private set; }
     public string Name { get; private set; }
     public AccountType Type { get; private set; }
     public Currency Currency { get; private set; }
@@ -27,7 +28,7 @@ public class Account : Entity, IAggregateRoot
         Transactions = new List<Transaction>();
     }
 
-    public Account(string name, AccountType type, Currency currency, string? description = null)
+    public Account(string name, AccountType type, Currency currency, string? description = null, Guid? userId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("El nombre de la cuenta es requerido");
@@ -39,6 +40,20 @@ public class Account : Entity, IAggregateRoot
         Description = description;
         IsActive = true;
         Transactions = new List<Transaction>();
+
+        if (userId.HasValue)
+            AssignOwner(userId.Value);
+    }
+
+    public void AssignOwner(Guid userId)
+    {
+        if (userId == Guid.Empty)
+            throw new DomainException("El ID de usuario no puede ser vacío");
+
+        if (UserId != Guid.Empty && UserId != userId)
+            throw new DomainException("La cuenta ya tiene un dueño asignado");
+
+        UserId = userId;
     }
 
     public Transaction AddTransaction(TransactionType type, decimal amount,

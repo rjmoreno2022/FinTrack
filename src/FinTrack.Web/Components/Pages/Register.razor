@@ -1,0 +1,156 @@
+@page "/register"
+@attribute [AllowAnonymous]
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Crear Cuenta - FinTrack</PageTitle>
+
+<div class="d-flex justify-center align-center" style="min-height: 85vh;">
+    <MudCard Elevation="4" Style="width: 100%; max-width: 520px;" Class="pa-6 rounded-lg my-4">
+        <div class="d-flex flex-column align-center mb-5">
+            <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Large" />
+            </MudAvatar>
+            <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Primary">Crear Cuenta</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Regístrate para comenzar a gestionar tus finanzas</MudText>
+        </div>
+
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+            💡 El primer usuario en registrarse en el sistema recibirá automáticamente el rol de <strong>Administrador</strong>.
+        </MudAlert>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => _errorMessage = null)">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <EditForm Model="@_registerModel" OnValidSubmit="HandleRegister">
+            <DataAnnotationsValidator />
+
+            <div class="d-flex gap-4 mb-4">
+                <MudTextField @bind-Value="_registerModel.FirstName"
+                              Label="Nombre"
+                              Variant="Variant.Outlined"
+                              For="@(() => _registerModel.FirstName)"
+                              Class="flex-1" />
+
+                <MudTextField @bind-Value="_registerModel.LastName"
+                              Label="Apellido"
+                              Variant="Variant.Outlined"
+                              For="@(() => _registerModel.LastName)"
+                              Class="flex-1" />
+            </div>
+
+            <MudTextField @bind-Value="_registerModel.Email"
+                          Label="Correo Electrónico"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Email"
+                          For="@(() => _registerModel.Email)"
+                          Class="mb-4" />
+
+            <MudSelect @bind-Value="_registerModel.PreferredCurrency"
+                       Label="Moneda Predeterminada"
+                       Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter"
+                       Class="mb-4">
+                <MudSelectItem Value="Currency.USD">USD - Dólar Estadounidense ($)</MudSelectItem>
+                <MudSelectItem Value="Currency.VES">VES - Bolívar Venezolano (Bs.)</MudSelectItem>
+                <MudSelectItem Value="Currency.EUR">EUR - Euro (€)</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField @bind-Value="_registerModel.Password"
+                          Label="Contraseña (mínimo 6 caracteres)"
+                          Variant="Variant.Outlined"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                          For="@(() => _registerModel.Password)"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_confirmPassword"
+                          Label="Confirmar Contraseña"
+                          Variant="Variant.Outlined"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Class="mb-6" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       FullWidth="true"
+                       Disabled="@_isLoading"
+                       Class="mb-4 py-2">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Registrando...</MudText>
+                }
+                else
+                {
+                    <MudText>Registrarse</MudText>
+                }
+            </MudButton>
+        </EditForm>
+
+        <MudDivider Class="my-4" />
+
+        <div class="d-flex justify-center align-center">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">¿Ya tienes una cuenta?</MudText>
+            <MudLink Href="/login" Class="ml-2 font-weight-bold" Color="Color.Primary">
+                Inicia sesión aquí
+            </MudLink>
+        </div>
+    </MudCard>
+</div>
+
+@code {
+    private RegisterRequest _registerModel = new();
+    private string _confirmPassword = string.Empty;
+    private bool _isLoading = false;
+    private bool _showPassword = false;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        if (_registerModel.Password != _confirmPassword)
+        {
+            _errorMessage = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await AuthService.RegisterAsync(_registerModel);
+            var roleMsg = response.User.Roles.Contains("Admin") ? " (con rol Administrador)" : "";
+            Snackbar.Add($"¡Cuenta creada exitosamente{roleMsg}! Bienvenido a FinTrack.", Severity.Success);
+            Navigation.NavigateTo("/", true);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

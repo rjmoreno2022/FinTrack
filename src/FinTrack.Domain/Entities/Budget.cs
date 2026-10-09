@@ -8,8 +8,9 @@ namespace FinTrack.Domain.Entities;
 /// <summary>
 /// Representa un presupuesto definido para gastos por categoría o generales durante un período.
 /// </summary>
-public class Budget : Entity, IAggregateRoot
+public class Budget : Entity, IAggregateRoot, IUserOwned
 {
+    public Guid UserId { get; private set; }
     public string Name { get; private set; }
     public Guid? CategoryId { get; private set; }
     public Category? Category { get; private set; }
@@ -34,7 +35,7 @@ public class Budget : Entity, IAggregateRoot
 
     public Budget(string name, decimal limitAmount, Currency currency,
         BudgetPeriod period, DateTime startDate, DateTime endDate,
-        Guid? categoryId = null)
+        Guid? categoryId = null, Guid? userId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("El nombre del presupuesto es requerido");
@@ -52,6 +53,20 @@ public class Budget : Entity, IAggregateRoot
         CategoryId = categoryId;
         SpentAmount = 0;
         IsActive = true;
+
+        if (userId.HasValue)
+            AssignOwner(userId.Value);
+    }
+
+    public void AssignOwner(Guid userId)
+    {
+        if (userId == Guid.Empty)
+            throw new DomainException("El ID de usuario no puede ser vacío");
+
+        if (UserId != Guid.Empty && UserId != userId)
+            throw new DomainException("El presupuesto ya tiene un dueño asignado");
+
+        UserId = userId;
     }
 
     public void RecordSpending(decimal amount)

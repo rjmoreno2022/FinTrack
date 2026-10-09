@@ -39,6 +39,10 @@ public class DebtConfiguration : IEntityTypeConfiguration<Debt>
         builder.Property(d => d.InterestRate)
             .HasPrecision(5, 2);
 
+        builder.Property(d => d.UserId)
+            .IsRequired();
+
+        builder.HasIndex(d => d.UserId);
         builder.HasIndex(d => new { d.Status, d.DueDate });
 
         builder.HasMany(d => d.Payments)

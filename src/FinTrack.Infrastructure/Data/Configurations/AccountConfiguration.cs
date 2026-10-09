@@ -32,6 +32,10 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.Property(a => a.IsActive)
             .HasDefaultValue(true);
 
+        builder.Property(a => a.UserId)
+            .IsRequired();
+
+        builder.HasIndex(a => a.UserId);
         builder.HasIndex(a => new { a.Name, a.IsActive });
 
         builder.HasMany(a => a.Transactions)

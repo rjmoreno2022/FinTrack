@@ -1,6 +1,8 @@
 using FinTrack.Domain.Interfaces;
 using FinTrack.Infrastructure.Data;
+using FinTrack.Infrastructure.Identity;
 using FinTrack.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,8 +27,21 @@ public static class DependencyInjection
             });
         });
 
+        services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
+        {
+            options.Password.RequireDigit = false;
+            options.Password.RequireLowercase = false;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequireUppercase = false;
+            options.Password.RequiredLength = 6;
+            options.User.RequireUniqueEmail = true;
+        })
+        .AddEntityFrameworkStores<FinTrackDbContext>()
+        .AddDefaultTokenProviders();
+
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<FinTrack.Application.Common.Interfaces.IJwtTokenService, JwtTokenService>();
 
         // HTTP Client para el portal del BCV con bypass de problemas de certificados SSL comunes
         services.AddHttpClient("BcvPortalClient", client =>

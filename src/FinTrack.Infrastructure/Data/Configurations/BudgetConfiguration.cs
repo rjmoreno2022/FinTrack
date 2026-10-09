@@ -32,6 +32,11 @@ public class BudgetConfiguration : IEntityTypeConfiguration<Budget>
         builder.Property(b => b.IsActive)
             .HasDefaultValue(true);
 
+        builder.Property(b => b.UserId)
+            .IsRequired();
+
+        builder.HasIndex(b => b.UserId);
+
         builder.HasOne(b => b.Category)
             .WithMany()
             .HasForeignKey(b => b.CategoryId)

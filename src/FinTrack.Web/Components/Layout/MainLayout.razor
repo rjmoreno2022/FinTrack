@@ -4,6 +4,8 @@
 @inject IDialogService DialogService
 @inject IServiceScopeFactory ScopeFactory
 @inject ISnackbar Snackbar
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
 
 <MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -52,7 +54,37 @@
         <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        Color="Color.Inherit"
                        OnClick="@ToggleTheme" />
-        <MudAvatar Color="Color.Primary" Size="Size.Small" Class="ml-2">FT</MudAvatar>
+
+        <AuthorizeView Context="authContext">
+            <Authorized>
+                <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                    <ActivatorContent>
+                        <MudAvatar Color="Color.Primary" Size="Size.Small" Class="ml-2 cursor-pointer">
+                            @(GetInitials(authContext.User))
+                        </MudAvatar>
+                    </ActivatorContent>
+                    <ChildContent>
+                        <div class="px-4 py-2">
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@authContext.User.Identity?.Name</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@(authContext.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "")</MudText>
+                            @if (authContext.User.IsInRole("Admin"))
+                            {
+                                <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="mt-1">Administrador</MudChip>
+                            }
+                        </div>
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error" OnClick="HandleLogout">
+                            Cerrar sesión
+                        </MudMenuItem>
+                    </ChildContent>
+                </MudMenu>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/login" Class="ml-2">
+                    Iniciar sesión
+                </MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
     </MudAppBar>
 
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
@@ -121,6 +153,24 @@
 
     private void DrawerToggle() => _drawerOpen = !_drawerOpen;
     private void ToggleTheme() => _isDarkMode = !_isDarkMode;
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", true);
+    }
+
+    private static string GetInitials(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var name = user.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(name))
+            return "U";
+
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return name[..Math.Min(2, name.Length)].ToUpper();
+    }
 
     private readonly MudTheme _theme = new()
     {

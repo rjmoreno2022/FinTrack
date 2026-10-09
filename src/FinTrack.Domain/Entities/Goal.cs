@@ -9,8 +9,9 @@ namespace FinTrack.Domain.Entities;
 /// <summary>
 /// Representa una meta de ahorro (ej. Fondo de Emergencia) y actúa como raíz del agregado.
 /// </summary>
-public class Goal : Entity, IAggregateRoot
+public class Goal : Entity, IAggregateRoot, IUserOwned
 {
+    public Guid UserId { get; private set; }
     public string Name { get; private set; }
     public string? Description { get; private set; }
     public decimal TargetAmount { get; private set; }
@@ -28,7 +29,7 @@ public class Goal : Entity, IAggregateRoot
 
     public Goal(string name, decimal targetAmount, Currency currency,
         DateTime? targetDate = null, string? description = null,
-        GoalPriority priority = GoalPriority.Medium)
+        GoalPriority priority = GoalPriority.Medium, Guid? userId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("El nombre de la meta es requerido");
@@ -43,6 +44,20 @@ public class Goal : Entity, IAggregateRoot
         Description = description;
         Priority = priority;
         Status = GoalStatus.Active;
+
+        if (userId.HasValue)
+            AssignOwner(userId.Value);
+    }
+
+    public void AssignOwner(Guid userId)
+    {
+        if (userId == Guid.Empty)
+            throw new DomainException("El ID de usuario no puede ser vacío");
+
+        if (UserId != Guid.Empty && UserId != userId)
+            throw new DomainException("La meta ya tiene un dueño asignado");
+
+        UserId = userId;
     }
 
     public void Contribute(decimal amount)

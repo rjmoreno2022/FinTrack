@@ -9,8 +9,9 @@ namespace FinTrack.Domain.Entities;
 /// <summary>
 /// Representa una deuda activa (dinero adeudado o por cobrar) que actúa como raíz del agregado.
 /// </summary>
-public class Debt : Entity, IAggregateRoot
+public class Debt : Entity, IAggregateRoot, IUserOwned
 {
+    public Guid UserId { get; private set; }
     public string Creditor { get; private set; }
     public string? Description { get; private set; }
     public decimal OriginalAmount { get; private set; }
@@ -32,7 +33,7 @@ public class Debt : Entity, IAggregateRoot
 
     public Debt(string creditor, decimal originalAmount, Currency currency,
         DebtType type, DateTime? dueDate = null, string? description = null,
-        decimal interestRate = 0)
+        decimal interestRate = 0, Guid? userId = null)
     {
         if (string.IsNullOrWhiteSpace(creditor))
             throw new DomainException("El acreedor es requerido");
@@ -50,6 +51,20 @@ public class Debt : Entity, IAggregateRoot
         InterestRate = interestRate;
         Status = DebtStatus.Active;
         Payments = new List<DebtPayment>();
+
+        if (userId.HasValue)
+            AssignOwner(userId.Value);
+    }
+
+    public void AssignOwner(Guid userId)
+    {
+        if (userId == Guid.Empty)
+            throw new DomainException("El ID de usuario no puede ser vacío");
+
+        if (UserId != Guid.Empty && UserId != userId)
+            throw new DomainException("La deuda ya tiene un dueño asignado");
+
+        UserId = userId;
     }
 
     public void RegisterPayment(decimal amount, DateTime date, string? note = null)

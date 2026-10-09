@@ -1,18 +1,32 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using FinTrack.Application.Common.Interfaces;
+using FinTrack.Domain.Common;
 using FinTrack.Domain.Entities;
 using FinTrack.Domain.Enums;
 using FinTrack.Domain.Events;
+using FinTrack.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinTrack.Infrastructure.Data;
 
-public class FinTrackDbContext : DbContext
+public class FinTrackDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
-    public FinTrackDbContext(DbContextOptions<FinTrackDbContext> options)
+    private readonly ICurrentUserService? _currentUserService;
+
+    public FinTrackDbContext(
+        DbContextOptions<FinTrackDbContext> options,
+        ICurrentUserService? currentUserService = null)
         : base(options)
     {
+        _currentUserService = currentUserService;
     }
+
+    public Guid CurrentUserId => _currentUserService?.UserId ?? Guid.Empty;
 
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
@@ -33,8 +47,53 @@ public class FinTrackDbContext : DbContext
         // Aplicar todas las configuraciones IEntityTypeConfiguration de este ensamblado
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(FinTrackDbContext).Assembly);
 
+        // Filtros globales de aislamiento multi-usuario
+        modelBuilder.Entity<Account>().HasQueryFilter(e => e.UserId == CurrentUserId);
+        modelBuilder.Entity<Budget>().HasQueryFilter(e => e.UserId == CurrentUserId);
+        modelBuilder.Entity<Goal>().HasQueryFilter(e => e.UserId == CurrentUserId);
+        modelBuilder.Entity<Debt>().HasQueryFilter(e => e.UserId == CurrentUserId);
+        modelBuilder.Entity<Transaction>().HasQueryFilter(t => t.Account.UserId == CurrentUserId);
+        modelBuilder.Entity<DebtPayment>().HasQueryFilter(p => p.Debt.UserId == CurrentUserId);
+        modelBuilder.Entity<Category>().HasQueryFilter(c => c.IsSystem || c.UserId == null || c.UserId == CurrentUserId);
+
         // Sembrado inicial de categorías predeterminadas del sistema
         modelBuilder.Entity<Category>().HasData(GetSeedCategories());
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        AssignOwnership();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    public override int SaveChanges()
+    {
+        AssignOwnership();
+        return base.SaveChanges();
+    }
+
+    private void AssignOwnership()
+    {
+        if (_currentUserService?.UserId.HasValue == true)
+        {
+            var userId = _currentUserService.UserId.Value;
+
+            foreach (var entry in ChangeTracker.Entries<IUserOwned>())
+            {
+                if (entry.State == EntityState.Added && entry.Entity.UserId == Guid.Empty)
+                {
+                    entry.Entity.AssignOwner(userId);
+                }
+            }
+
+            foreach (var entry in ChangeTracker.Entries<Category>())
+            {
+                if (entry.State == EntityState.Added && !entry.Entity.IsSystem && !entry.Entity.UserId.HasValue)
+                {
+                    entry.Entity.AssignOwner(userId);
+                }
+            }
+        }
     }
 
     private static IEnumerable<Category> GetSeedCategories()

@@ -36,6 +36,10 @@ public class GoalConfiguration : IEntityTypeConfiguration<Goal>
             .HasConversion<string>()
             .HasMaxLength(50);
 
+        builder.Property(g => g.UserId)
+            .IsRequired();
+
+        builder.HasIndex(g => g.UserId);
         builder.HasIndex(g => g.Status);
     }
 }

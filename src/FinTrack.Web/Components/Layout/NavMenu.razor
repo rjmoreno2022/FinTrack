@@ -31,9 +31,12 @@
         <MudNavLink Href="/debts" Icon="@Icons.Material.Filled.MoneyOff">Deudas</MudNavLink>
     </MudNavGroup>
 
-    <MudDivider Class="my-3" />
-
-    <MudNavLink Href="/swagger" Target="_blank" Icon="@Icons.Material.Filled.Api">
-        API REST (Swagger)
-    </MudNavLink>
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <MudDivider Class="my-3" />
+            <MudNavLink Href="/swagger" Target="_blank" Icon="@Icons.Material.Filled.Api">
+                API REST (Swagger)
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
 </MudNavMenu>

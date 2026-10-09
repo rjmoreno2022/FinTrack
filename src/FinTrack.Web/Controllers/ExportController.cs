@@ -4,10 +4,12 @@ using FinTrack.Application.Reports.Queries;
 using FinTrack.Application.Transactions.Queries;
 using FinTrack.Domain.Enums;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinTrack.Web.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ExportController : ControllerBase

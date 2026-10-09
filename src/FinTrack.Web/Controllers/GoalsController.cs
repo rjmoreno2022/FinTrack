@@ -4,10 +4,12 @@ using FinTrack.Application.Goals.Commands;
 using FinTrack.Application.Goals.DTOs;
 using FinTrack.Application.Goals.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinTrack.Web.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class GoalsController : ControllerBase

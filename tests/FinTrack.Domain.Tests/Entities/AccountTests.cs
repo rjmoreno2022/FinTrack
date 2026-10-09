@@ -163,4 +163,51 @@ public class AccountTests
         tx.Date.Should().Be(newDate);
         tx.Tags.Should().Be("tag1");
     }
+
+    [Fact]
+    public void AssignOwner_WithValidGuid_ShouldSetUserId()
+    {
+        var account = new Account("Test", AccountType.Bank, Currency.USD);
+        var userId = Guid.NewGuid();
+
+        account.AssignOwner(userId);
+
+        account.UserId.Should().Be(userId);
+    }
+
+    [Fact]
+    public void AssignOwner_WithEmptyGuid_ShouldThrowDomainException()
+    {
+        var account = new Account("Test", AccountType.Bank, Currency.USD);
+
+        var act = () => account.AssignOwner(Guid.Empty);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("El ID de usuario no puede ser vacío");
+    }
+
+    [Fact]
+    public void AssignOwner_WhenAlreadyAssignedToDifferentUser_ShouldThrowDomainException()
+    {
+        var owner1 = Guid.NewGuid();
+        var owner2 = Guid.NewGuid();
+        var account = new Account("Test", AccountType.Bank, Currency.USD, userId: owner1);
+
+        var act = () => account.AssignOwner(owner2);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("La cuenta ya tiene un dueño asignado");
+    }
+
+    [Fact]
+    public void AssignOwner_WhenReassignedToSameUser_ShouldSucceed()
+    {
+        var owner = Guid.NewGuid();
+        var account = new Account("Test", AccountType.Bank, Currency.USD, userId: owner);
+
+        var act = () => account.AssignOwner(owner);
+
+        act.Should().NotThrow();
+        account.UserId.Should().Be(owner);
+    }
 }

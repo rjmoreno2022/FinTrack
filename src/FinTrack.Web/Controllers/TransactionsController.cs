@@ -4,10 +4,12 @@ using FinTrack.Application.Transactions.Commands;
 using FinTrack.Application.Transactions.DTOs;
 using FinTrack.Application.Transactions.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinTrack.Web.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class TransactionsController : ControllerBase

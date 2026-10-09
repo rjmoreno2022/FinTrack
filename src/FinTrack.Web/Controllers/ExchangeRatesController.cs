@@ -4,10 +4,12 @@ using FinTrack.Application.ExchangeRates.Commands;
 using FinTrack.Application.ExchangeRates.DTOs;
 using FinTrack.Application.ExchangeRates.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinTrack.Web.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ExchangeRatesController : ControllerBase

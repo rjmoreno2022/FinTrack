@@ -1,0 +1,118 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Iniciar Sesión - FinTrack</PageTitle>
+
+<div class="d-flex justify-center align-center" style="min-height: 80vh;">
+    <MudCard Elevation="4" Style="width: 100%; max-width: 440px;" Class="pa-6 rounded-lg">
+        <div class="d-flex flex-column align-center mb-6">
+            <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Large" />
+            </MudAvatar>
+            <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Primary">FinTrack</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Inicia sesión para gestionar tus finanzas</MudText>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => _errorMessage = null)">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            <MudTextField @bind-Value="_loginModel.Email"
+                          Label="Correo Electrónico"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Email"
+                          For="@(() => _loginModel.Email)"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_loginModel.Password"
+                          Label="Contraseña"
+                          Variant="Variant.Outlined"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                          For="@(() => _loginModel.Password)"
+                          Class="mb-6" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       FullWidth="true"
+                       Disabled="@_isLoading"
+                       Class="mb-4 py-2">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Iniciando sesión...</MudText>
+                }
+                else
+                {
+                    <MudText>Iniciar Sesión</MudText>
+                }
+            </MudButton>
+        </EditForm>
+
+        <MudDivider Class="my-4" />
+
+        <div class="d-flex justify-center align-center">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">¿No tienes una cuenta?</MudText>
+            <MudLink Href="/register" Class="ml-2 font-weight-bold" Color="Color.Primary">
+                Regístrate aquí
+            </MudLink>
+        </div>
+    </MudCard>
+</div>
+
+@code {
+    private LoginRequest _loginModel = new();
+    private bool _isLoading = false;
+    private bool _showPassword = false;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await AuthService.LoginAsync(_loginModel);
+            Snackbar.Add($"¡Bienvenido de nuevo, {response.User.FirstName}!", Severity.Success);
+            Navigation.NavigateTo("/", true);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _errorMessage = "Correo o contraseña incorrectos.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

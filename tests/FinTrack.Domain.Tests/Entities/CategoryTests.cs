@@ -56,4 +56,63 @@ public class CategoryTests
         act.Should().Throw<DomainException>()
             .WithMessage("No se pueden modificar categorías del sistema");
     }
+
+    [Fact]
+    public void AssignOwner_WithValidGuid_ShouldSetUserId()
+    {
+        var category = new Category("Personalizada", CategoryType.Expense);
+        var userId = Guid.NewGuid();
+
+        category.AssignOwner(userId);
+
+        category.UserId.Should().Be(userId);
+    }
+
+    [Fact]
+    public void AssignOwner_WhenIsSystemCategory_ShouldThrowDomainException()
+    {
+        var category = new Category("General", CategoryType.Expense, isSystem: true);
+        var userId = Guid.NewGuid();
+
+        var act = () => category.AssignOwner(userId);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("No se puede asignar dueño a una categoría del sistema");
+    }
+
+    [Fact]
+    public void AssignOwner_WithEmptyGuid_ShouldThrowDomainException()
+    {
+        var category = new Category("Personalizada", CategoryType.Expense);
+
+        var act = () => category.AssignOwner(Guid.Empty);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("El ID de usuario no puede ser vacío");
+    }
+
+    [Fact]
+    public void AssignOwner_WhenAlreadyAssignedToDifferentUser_ShouldThrowDomainException()
+    {
+        var owner1 = Guid.NewGuid();
+        var owner2 = Guid.NewGuid();
+        var category = new Category("Personalizada", CategoryType.Expense, userId: owner1);
+
+        var act = () => category.AssignOwner(owner2);
+
+        act.Should().Throw<DomainException>()
+            .WithMessage("La categoría ya tiene un dueño asignado");
+    }
+
+    [Fact]
+    public void AssignOwner_WhenReassignedToSameUser_ShouldSucceed()
+    {
+        var owner = Guid.NewGuid();
+        var category = new Category("Personalizada", CategoryType.Expense, userId: owner);
+
+        var act = () => category.AssignOwner(owner);
+
+        act.Should().NotThrow();
+        category.UserId.Should().Be(owner);
+    }
 }

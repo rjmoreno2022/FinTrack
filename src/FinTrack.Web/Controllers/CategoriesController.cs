@@ -4,10 +4,12 @@ using FinTrack.Application.Categories.Commands;
 using FinTrack.Application.Categories.DTOs;
 using FinTrack.Application.Categories.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinTrack.Web.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class CategoriesController : ControllerBase

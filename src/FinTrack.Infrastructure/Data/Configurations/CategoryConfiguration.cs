@@ -28,6 +28,11 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(c => c.IsSystem)
             .HasDefaultValue(false);
 
+        builder.Property(c => c.UserId)
+            .IsRequired(false);
+
+        builder.HasIndex(c => c.UserId);
+
         builder.HasOne(c => c.ParentCategory)
             .WithMany(c => c.SubCategories)
             .HasForeignKey(c => c.ParentCategoryId)
