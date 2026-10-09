@@ -12,11 +12,11 @@
     <link rel="stylesheet" href="@Assets["FinTrack.Web.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet @rendermode="RenderModeNoPrerender" />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="RenderModeNoPrerender" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
@@ -24,3 +24,7 @@
 </body>
 
 </html>
+
+@code {
+    private static IComponentRenderMode RenderModeNoPrerender => new InteractiveServerRenderMode(prerender: false);
+}
