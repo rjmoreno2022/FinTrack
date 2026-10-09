@@ -57,11 +57,21 @@
 
         <AuthorizeView Context="authContext">
             <Authorized>
-                <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
                     <ActivatorContent>
-                        <MudAvatar Color="Color.Primary" Size="Size.Small" Class="ml-2 cursor-pointer">
-                            @(GetInitials(authContext.User))
-                        </MudAvatar>
+                        <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="d-flex align-center gap-2 pa-1 ml-2">
+                            <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                @(GetInitials(authContext.User))
+                            </MudAvatar>
+                            <div class="d-none d-md-flex flex-column align-start text-left">
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">@authContext.User.Identity?.Name</MudText>
+                                @if (authContext.User.IsInRole("Admin"))
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Warning" Style="line-height: 1;">Administrador</MudText>
+                                }
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" />
+                        </MudButton>
                     </ActivatorContent>
                     <ChildContent>
                         <div class="px-4 py-2">
@@ -69,7 +79,7 @@
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@(authContext.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "")</MudText>
                             @if (authContext.User.IsInRole("Admin"))
                             {
-                                <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="mt-1">Administrador</MudChip>
+                                <div><MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="mt-1">Administrador</MudChip></div>
                             }
                         </div>
                         <MudDivider />
@@ -78,9 +88,17 @@
                         </MudMenuItem>
                     </ChildContent>
                 </MudMenu>
+
+                <MudTooltip Text="Cerrar sesión">
+                    <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                                   Color="Color.Error"
+                                   Size="Size.Medium"
+                                   OnClick="@HandleLogout"
+                                   Class="ml-1" />
+                </MudTooltip>
             </Authorized>
             <NotAuthorized>
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/login" Class="ml-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/login" Class="ml-2" Size="Size.Small">
                     Iniciar sesión
                 </MudButton>
             </NotAuthorized>
