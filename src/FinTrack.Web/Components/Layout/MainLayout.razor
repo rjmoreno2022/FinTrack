@@ -63,13 +63,13 @@
                             <MudAvatar Color="Color.Primary" Size="Size.Small">
                                 @(GetInitials(authContext.User))
                             </MudAvatar>
-                            <MudText Typo="Typo.body2" Class="font-weight-bold d-none d-md-flex">@authContext.User.Identity?.Name</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold d-none d-md-flex">@(GetFirstName(authContext.User))</MudText>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" />
                         </MudButton>
                     </ActivatorContent>
                     <ChildContent>
                         <div class="px-4 py-2">
-                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@authContext.User.Identity?.Name</MudText>
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@(GetFirstName(authContext.User))</MudText>
                         </div>
                         <MudDivider />
                         <MudMenuItem Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error" OnClick="HandleLogout">
@@ -177,6 +177,20 @@
         if (parts.Length >= 2)
             return $"{parts[0][0]}{parts[1][0]}".ToUpper();
         return name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private static string GetFirstName(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var firstName = user.FindFirst("firstName")?.Value 
+                     ?? user.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value;
+        if (!string.IsNullOrWhiteSpace(firstName))
+            return firstName;
+
+        var name = user.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(name))
+            return "Usuario";
+
+        return name.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
     }
 
     private readonly MudTheme _theme = new()
