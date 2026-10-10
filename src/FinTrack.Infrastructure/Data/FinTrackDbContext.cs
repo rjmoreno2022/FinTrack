@@ -62,14 +62,41 @@ public class FinTrackDbContext : IdentityDbContext<ApplicationUser, IdentityRole
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        ChangeTracker.DetectChanges();
+        FixUnsavedChildEntities();
         AssignOwnership();
         return base.SaveChangesAsync(cancellationToken);
     }
 
     public override int SaveChanges()
     {
+        ChangeTracker.DetectChanges();
+        FixUnsavedChildEntities();
         AssignOwnership();
         return base.SaveChanges();
+    }
+
+    private void FixUnsavedChildEntities()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State == EntityState.Modified && entry.Entity is Transaction transaction)
+            {
+                var exists = Transactions.IgnoreQueryFilters().Any(t => t.Id == transaction.Id);
+                if (!exists)
+                {
+                    entry.State = EntityState.Added;
+                }
+            }
+            else if (entry.State == EntityState.Modified && entry.Entity is DebtPayment debtPayment)
+            {
+                var exists = DebtPayments.IgnoreQueryFilters().Any(p => p.Id == debtPayment.Id);
+                if (!exists)
+                {
+                    entry.State = EntityState.Added;
+                }
+            }
+        }
     }
 
     private void AssignOwnership()

@@ -13,10 +13,11 @@ public class PagedList<T>
     public bool HasPreviousPage => PageNumber > 1;
     public bool HasNextPage => PageNumber < TotalPages;
 
-    public PagedList(IReadOnlyList<T> items, int count, int pageNumber, int pageSize)
+    [System.Text.Json.Serialization.JsonConstructor]
+    public PagedList(IReadOnlyList<T> items, int totalCount, int pageNumber, int pageSize)
     {
         Items = items;
-        TotalCount = count;
+        TotalCount = totalCount;
         PageNumber = pageNumber;
         PageSize = pageSize;
     }

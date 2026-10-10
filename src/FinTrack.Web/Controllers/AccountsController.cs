@@ -12,6 +12,7 @@ namespace FinTrack.Web.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[IgnoreAntiforgeryToken]
 public class AccountsController : ControllerBase
 {
     private readonly IMediator _mediator;

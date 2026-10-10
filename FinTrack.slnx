@@ -1,5 +1,9 @@
 <Solution>
   <Project Path="src/FinTrack.Domain/FinTrack.Domain.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/FinTrack.Integration.Tests/FinTrack.Integration.Tests.csproj" />
+    <Project Path="tests/FinTrack.UI.Tests/FinTrack.UI.Tests.csproj" />
+  </Folder>
   <Project Path="src/FinTrack.Application/FinTrack.Application.csproj" />
   <Project Path="src/FinTrack.Infrastructure/FinTrack.Infrastructure.csproj" />
   <Project Path="src/FinTrack.Web/FinTrack.Web.csproj" />
