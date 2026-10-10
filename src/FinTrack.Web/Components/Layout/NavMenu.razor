@@ -1,6 +1,3 @@
-@inject IAuthService AuthService
-@inject NavigationManager Navigation
-
 <MudNavMenu Class="mt-3">
     <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
         Dashboard
@@ -42,21 +39,4 @@
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
-
-    <AuthorizeView>
-        <Authorized>
-            <MudDivider Class="my-3" />
-            <MudNavLink Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error" OnClick="HandleLogout" Class="cursor-pointer">
-                Cerrar Sesión
-            </MudNavLink>
-        </Authorized>
-    </AuthorizeView>
 </MudNavMenu>
-
-@code {
-    private async Task HandleLogout()
-    {
-        await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/login", true);
-    }
-}

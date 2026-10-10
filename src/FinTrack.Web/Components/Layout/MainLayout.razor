@@ -63,24 +63,13 @@
                             <MudAvatar Color="Color.Primary" Size="Size.Small">
                                 @(GetInitials(authContext.User))
                             </MudAvatar>
-                            <div class="d-none d-md-flex flex-column align-start text-left">
-                                <MudText Typo="Typo.body2" Class="font-weight-bold">@authContext.User.Identity?.Name</MudText>
-                                @if (authContext.User.IsInRole("Admin"))
-                                {
-                                    <MudText Typo="Typo.caption" Color="Color.Warning" Style="line-height: 1;">Administrador</MudText>
-                                }
-                            </div>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold d-none d-md-flex">@authContext.User.Identity?.Name</MudText>
                             <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" />
                         </MudButton>
                     </ActivatorContent>
                     <ChildContent>
                         <div class="px-4 py-2">
                             <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@authContext.User.Identity?.Name</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@(authContext.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "")</MudText>
-                            @if (authContext.User.IsInRole("Admin"))
-                            {
-                                <div><MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="mt-1">Administrador</MudChip></div>
-                            }
                         </div>
                         <MudDivider />
                         <MudMenuItem Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error" OnClick="HandleLogout">
