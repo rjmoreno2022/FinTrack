@@ -39,6 +39,27 @@ public class UpdateAndDeleteAccountHandlerTests
     }
 
     [Fact]
+    public async Task UpdateAccount_WithBalance_ShouldUpdateBalanceAndReturnSuccess()
+    {
+        // Arrange
+        var account = new Account("Cuenta", AccountType.Bank, Currency.USD, initialBalance: 100m);
+        _accountRepoMock.Setup(r => r.GetByIdAsync(account.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(account);
+
+        var handler = new UpdateAccountHandler(_accountRepoMock.Object, _unitOfWorkMock.Object);
+        var command = new UpdateAccountCommand(account.Id, "Cuenta", null, Balance: 300m);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        account.Balance.Should().Be(300m);
+        _accountRepoMock.Verify(r => r.Update(account), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task UpdateAccount_WhenAccountNotFound_ShouldReturnFail()
     {
         // Arrange

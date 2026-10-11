@@ -39,6 +39,20 @@ public class DeleteTransactionHandler : IRequestHandler<DeleteTransactionCommand
         if (account == null)
             return Result.Fail("No se encontró la cuenta o la transacción solicitada");
 
+        var transaction = account.Transactions.FirstOrDefault(t => t.Id == request.Id);
+        if (transaction != null &&
+            transaction.Type == FinTrack.Domain.Enums.TransactionType.Transfer &&
+            transaction.TransferAccountId.HasValue &&
+            transaction.RelatedTransactionId.HasValue)
+        {
+            var relatedAccount = await _accountRepo.GetByIdAsync(transaction.TransferAccountId.Value, ct);
+            if (relatedAccount != null && relatedAccount.Transactions.Any(t => t.Id == transaction.RelatedTransactionId.Value))
+            {
+                relatedAccount.RemoveTransaction(transaction.RelatedTransactionId.Value);
+                _accountRepo.Update(relatedAccount);
+            }
+        }
+
         account.RemoveTransaction(request.Id);
 
         _accountRepo.Update(account);

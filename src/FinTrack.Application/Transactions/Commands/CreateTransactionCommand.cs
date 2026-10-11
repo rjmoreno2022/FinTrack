@@ -52,8 +52,46 @@ public class CreateTransactionHandler : IRequestHandler<CreateTransactionCommand
         if (currency != account.Currency)
             return Result<Guid>.Fail($"La moneda de la transacción ({currency}) debe coincidir con la de la cuenta ({account.Currency})");
 
-        // Validar fondos suficientes para gastos y transferencias
-        if ((type == TransactionType.Expense || type == TransactionType.Transfer) && request.Amount > account.Balance)
+        // Si es transferencia
+        if (type == TransactionType.Transfer)
+        {
+            if (!request.TransferAccountId.HasValue)
+                return Result<Guid>.Fail("Debe especificar una cuenta destino para la transferencia");
+
+            if (request.TransferAccountId.Value == request.AccountId)
+                return Result<Guid>.Fail("La cuenta de destino debe ser diferente a la de origen");
+
+            var destAccount = await _accountRepo.GetByIdAsync(request.TransferAccountId.Value, ct);
+            if (destAccount == null)
+                return Result<Guid>.Fail("Cuenta de destino no encontrada");
+
+            if (!destAccount.IsActive)
+                return Result<Guid>.Fail("La cuenta de destino está inactiva");
+
+            if (request.Amount > account.Balance)
+            {
+                return Result<Guid>.Fail(
+                    $"Fondos insuficientes. Balance actual: {account.Currency} {account.Balance:N2}");
+            }
+
+            string sourceDesc = string.IsNullOrWhiteSpace(request.Description) ? $"Transferencia a {destAccount.Name}" : request.Description.Trim();
+            string destDesc = string.IsNullOrWhiteSpace(request.Description) ? $"Transferencia desde {account.Name}" : request.Description.Trim();
+
+            var outTx = account.AddOutgoingTransfer(request.Amount, destAccount.Id, sourceDesc, request.Date, request.CategoryId, request.Tags);
+            var inTx = destAccount.AddIncomingTransfer(request.Amount, account.Id, destDesc, request.Date, request.CategoryId, request.Tags);
+
+            outTx.SetTransferInfo(destAccount.Id, inTx.Id);
+            inTx.SetTransferInfo(account.Id, outTx.Id);
+
+            _accountRepo.Update(account);
+            _accountRepo.Update(destAccount);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return Result<Guid>.Ok(outTx.Id);
+        }
+
+        // Validar fondos suficientes para gastos
+        if (type == TransactionType.Expense && request.Amount > account.Balance)
         {
             return Result<Guid>.Fail(
                 $"Fondos insuficientes. Balance actual: {account.Currency} {account.Balance:N2}");

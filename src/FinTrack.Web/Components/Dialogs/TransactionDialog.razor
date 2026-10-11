@@ -29,7 +29,26 @@
                        Class="mb-3">
                 <MudSelectItem Value="@("Income")">🟢 Ingreso (+)</MudSelectItem>
                 <MudSelectItem Value="@("Expense")">🔴 Gasto (-)</MudSelectItem>
+                <MudSelectItem Value="@("Transfer")">🔄 Transferencia entre Cuentas</MudSelectItem>
             </MudSelect>
+
+            @if (_type == "Transfer")
+            {
+                <MudSelect T="Guid?"
+                           Label="Cuenta Destino"
+                           @bind-Value="_transferAccountId"
+                           Required="true"
+                           RequiredError="Debe seleccionar la cuenta de destino"
+                           Disabled="@(Transaction != null)"
+                           Class="mb-3">
+                    @foreach (var acc in _accounts.Where(a => a.Id != _accountId && a.IsActive))
+                    {
+                        <MudSelectItem Value="@((Guid?)acc.Id)">
+                            @acc.Name (@acc.Currency @acc.Balance.ToString("N2"))
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
 
             <MudNumericField T="decimal"
                              Label="Monto"
@@ -42,18 +61,21 @@
                              Disabled="@(Transaction != null)"
                              Class="mb-3" />
 
-            <MudSelect T="Guid?"
-                       Label="Categoría"
-                       @bind-Value="_categoryId"
-                       Clearable="true"
-                       Class="mb-3">
-                @foreach (var cat in _filteredCategories)
-                {
-                    <MudSelectItem Value="@((Guid?)cat.Id)">
-                        @cat.Name
-                    </MudSelectItem>
-                }
-            </MudSelect>
+            @if (_type != "Transfer")
+            {
+                <MudSelect T="Guid?"
+                           Label="Categoría"
+                           @bind-Value="_categoryId"
+                           Clearable="true"
+                           Class="mb-3">
+                    @foreach (var cat in _filteredCategories)
+                    {
+                        <MudSelectItem Value="@((Guid?)cat.Id)">
+                            @cat.Name
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
 
             <MudDatePicker Label="Fecha"
                            @bind-Date="_date"
@@ -113,6 +135,7 @@
         _categories.Where(c => c.Type.Equals(_type, StringComparison.OrdinalIgnoreCase));
 
     private Guid _accountId;
+    private Guid? _transferAccountId;
     private string _type = "Expense";
     private decimal _amount = 10m;
     private Guid? _categoryId;
@@ -128,6 +151,7 @@
         if (Transaction != null)
         {
             _accountId = Transaction.AccountId;
+            _transferAccountId = Transaction.TransferAccountId;
             _type = Transaction.Type;
             _amount = Transaction.Amount;
             _categoryId = Transaction.CategoryId;
@@ -143,11 +167,20 @@
         {
             _accountId = _accounts.First().Id;
         }
+
+        if (_type == "Transfer" && _transferAccountId == null)
+        {
+            _transferAccountId = _accounts.FirstOrDefault(a => a.Id != _accountId)?.Id;
+        }
     }
 
     private void OnTypeChanged(IEnumerable<string> values)
     {
         _categoryId = null; // Reiniciar categoría al cambiar tipo
+        if (_type == "Transfer" && (_transferAccountId == null || _transferAccountId == _accountId))
+        {
+            _transferAccountId = _accounts.FirstOrDefault(a => a.Id != _accountId)?.Id;
+        }
     }
 
     private void Cancel() => MudDialog.Cancel();
@@ -164,6 +197,20 @@
             return;
         }
 
+        if (_type == "Transfer")
+        {
+            if (!_transferAccountId.HasValue || _transferAccountId == Guid.Empty)
+            {
+                Snackbar.Add("Debe seleccionar la cuenta de destino para la transferencia", Severity.Warning);
+                return;
+            }
+            if (_transferAccountId == _accountId)
+            {
+                Snackbar.Add("La cuenta de destino debe ser diferente a la de origen", Severity.Warning);
+                return;
+            }
+        }
+
         _isSaving = true;
         try
         {
@@ -178,7 +225,8 @@
                     Description = _description.Trim(),
                     Date = _date ?? DateTime.UtcNow,
                     CategoryId = _categoryId,
-                    Tags = _tags?.Trim()
+                    Tags = _tags?.Trim(),
+                    TransferAccountId = _type == "Transfer" ? _transferAccountId : null
                 };
 
                 await TransactionService.CreateAsync(request);

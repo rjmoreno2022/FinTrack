@@ -55,15 +55,18 @@ public class AppState
     }
 
     public decimal ConvertToDisplay(decimal amount, string fromCurrency)
+        => Convert(amount, fromCurrency, DisplayCurrency);
+
+    public decimal Convert(decimal amount, string fromCurrency, string toCurrency)
     {
-        if (string.Equals(fromCurrency, DisplayCurrency, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(fromCurrency, toCurrency, StringComparison.OrdinalIgnoreCase))
             return amount;
 
         // Normalizar USDT a USD
         var normalizedFrom = string.Equals(fromCurrency, "USDT", StringComparison.OrdinalIgnoreCase) ? "USD" : fromCurrency.ToUpperInvariant();
-        var normalizedDisplay = string.Equals(DisplayCurrency, "USDT", StringComparison.OrdinalIgnoreCase) ? "USD" : DisplayCurrency.ToUpperInvariant();
+        var normalizedTo = string.Equals(toCurrency, "USDT", StringComparison.OrdinalIgnoreCase) ? "USD" : toCurrency.ToUpperInvariant();
 
-        if (string.Equals(normalizedFrom, normalizedDisplay, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedFrom, normalizedTo, StringComparison.OrdinalIgnoreCase))
             return amount;
 
         // Convertir origen a VES (como moneda puente)
@@ -76,7 +79,7 @@ public class AppState
         };
 
         // Convertir de VES a la moneda de destino
-        decimal converted = normalizedDisplay switch
+        decimal converted = normalizedTo switch
         {
             "VES" => amountInVes,
             "USD" => ExchangeRateUsdToVes > 0 ? amountInVes / ExchangeRateUsdToVes : amountInVes,

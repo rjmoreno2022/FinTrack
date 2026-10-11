@@ -12,12 +12,20 @@
             Gestiona tus cuentas bancarias, billeteras, efectivo y criptomonedas
         </MudText>
     </div>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Add"
-               OnClick="OpenCreateDialog">
-        Nueva Cuenta
-    </MudButton>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.SwapHoriz"
+                   OnClick="() => OpenTransferDialog()">
+            Transferir
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
+            Nueva Cuenta
+        </MudButton>
+    </MudStack>
 </MudStack>
 
 @if (_isLoading)
@@ -130,6 +138,12 @@ else
                 }
             </MudTd>
             <MudTd Style="text-align: right">
+                <MudTooltip Text="Transferir desde esta cuenta">
+                    <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                                   Size="Size.Small"
+                                   Color="Color.Info"
+                                   OnClick="() => OpenTransferDialog(context.Id)" />
+                </MudTooltip>
                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                Size="Size.Small"
                                Color="Color.Primary"
@@ -183,6 +197,24 @@ else
                (account.Description != null && account.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
                account.Type.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
                account.Currency.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task OpenTransferDialog(Guid? preselectedAccountId = null)
+    {
+        var parameters = new DialogParameters<Components.Dialogs.TransferDialog>();
+        if (preselectedAccountId.HasValue)
+        {
+            parameters.Add(x => x.PreselectedSourceAccountId, preselectedAccountId.Value);
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<Components.Dialogs.TransferDialog>("Transferir entre Cuentas", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadAccounts();
+        }
     }
 
     private async Task OpenCreateDialog()

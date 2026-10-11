@@ -29,6 +29,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.Property(t => t.Tags)
             .HasMaxLength(255);
 
+        builder.Property(t => t.IsIncomingTransfer)
+            .HasDefaultValue(false);
+
         builder.HasOne(t => t.Category)
             .WithMany()
             .HasForeignKey(t => t.CategoryId)

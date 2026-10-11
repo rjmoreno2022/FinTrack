@@ -18,6 +18,7 @@ public class TransactionDto
     public bool IsRecurring { get; set; }
     public Guid? TransferAccountId { get; set; }
     public Guid? RelatedTransactionId { get; set; }
+    public bool IsIncomingTransfer { get; set; }
 }
 
 public class CreateTransactionRequest

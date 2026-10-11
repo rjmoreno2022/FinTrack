@@ -57,4 +57,43 @@ public class DeleteTransactionHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("No se encontró");
     }
+
+    [Fact]
+    public async Task DeleteTransaction_WhenTransferWithRelatedTransaction_ShouldRemoveBothAndRevertBalances()
+    {
+        // Arrange
+        var source = new Account("Origen", AccountType.Bank, Currency.USD, initialBalance: 1000m);
+        var dest = new Account("Destino", AccountType.Cash, Currency.USD, initialBalance: 100m);
+
+        var outTx = source.AddOutgoingTransfer(200m, dest.Id, "Transferencia", DateTime.UtcNow);
+        var inTx = dest.AddIncomingTransfer(200m, source.Id, "Transferencia", DateTime.UtcNow);
+
+        outTx.SetTransferInfo(dest.Id, inTx.Id);
+        inTx.SetTransferInfo(source.Id, outTx.Id);
+
+        source.Balance.Should().Be(800m);
+        dest.Balance.Should().Be(300m);
+
+        _accountRepoMock.Setup(r => r.GetByIdAsync(source.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(source);
+        _accountRepoMock.Setup(r => r.GetByIdAsync(dest.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(dest);
+
+        var handler = new DeleteTransactionHandler(_accountRepoMock.Object, _unitOfWorkMock.Object);
+        var command = new DeleteTransactionCommand(outTx.Id, source.Id);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        source.Balance.Should().Be(1000m);
+        dest.Balance.Should().Be(100m);
+        source.Transactions.Should().BeEmpty();
+        dest.Transactions.Should().BeEmpty();
+
+        _accountRepoMock.Verify(r => r.Update(source), Times.Once);
+        _accountRepoMock.Verify(r => r.Update(dest), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

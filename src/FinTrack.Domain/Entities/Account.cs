@@ -16,6 +16,7 @@ public class Account : Entity, IAggregateRoot, IUserOwned
     public string Name { get; private set; }
     public AccountType Type { get; private set; }
     public Currency Currency { get; private set; }
+    public decimal InitialBalance { get; private set; }
     public decimal Balance { get; private set; }
     public string? Description { get; private set; }
     public bool IsActive { get; private set; }
@@ -28,7 +29,7 @@ public class Account : Entity, IAggregateRoot, IUserOwned
         Transactions = new List<Transaction>();
     }
 
-    public Account(string name, AccountType type, Currency currency, string? description = null, Guid? userId = null)
+    public Account(string name, AccountType type, Currency currency, string? description = null, Guid? userId = null, decimal initialBalance = 0m)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("El nombre de la cuenta es requerido");
@@ -36,7 +37,8 @@ public class Account : Entity, IAggregateRoot, IUserOwned
         Name = name;
         Type = type;
         Currency = currency;
-        Balance = 0;
+        InitialBalance = initialBalance;
+        Balance = initialBalance;
         Description = description;
         IsActive = true;
         Transactions = new List<Transaction>();
@@ -54,6 +56,12 @@ public class Account : Entity, IAggregateRoot, IUserOwned
             throw new DomainException("La cuenta ya tiene un dueño asignado");
 
         UserId = userId;
+    }
+
+    public void SetBalance(decimal newBalance)
+    {
+        Balance = newBalance;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public Transaction AddTransaction(TransactionType type, decimal amount,
@@ -74,6 +82,40 @@ public class Account : Entity, IAggregateRoot, IUserOwned
         return transaction;
     }
 
+    public Transaction AddOutgoingTransfer(decimal amount, Guid destinationAccountId,
+        string description, DateTime date, Guid? categoryId = null, string? tags = null)
+    {
+        if (!IsActive)
+            throw new DomainException("No se pueden agregar transacciones a una cuenta inactiva");
+
+        var transaction = new Transaction(Id, TransactionType.Transfer, amount, Currency,
+            description, date, categoryId, tags, isRecurring: false, isIncomingTransfer: false);
+
+        Balance -= amount;
+        Transactions.Add(transaction);
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new TransactionCreatedEvent(transaction.Id, Id, amount, TransactionType.Transfer));
+        return transaction;
+    }
+
+    public Transaction AddIncomingTransfer(decimal amount, Guid sourceAccountId,
+        string description, DateTime date, Guid? categoryId = null, string? tags = null)
+    {
+        if (!IsActive)
+            throw new DomainException("No se pueden agregar transacciones a una cuenta inactiva");
+
+        var transaction = new Transaction(Id, TransactionType.Transfer, amount, Currency,
+            description, date, categoryId, tags, isRecurring: false, isIncomingTransfer: true);
+
+        Balance += amount;
+        Transactions.Add(transaction);
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new TransactionCreatedEvent(transaction.Id, Id, amount, TransactionType.Transfer));
+        return transaction;
+    }
+
     public void RemoveTransaction(Guid transactionId)
     {
         var transaction = Transactions.FirstOrDefault(t => t.Id == transactionId);
@@ -84,7 +126,9 @@ public class Account : Entity, IAggregateRoot, IUserOwned
         {
             TransactionType.Income => Balance - transaction.Amount,
             TransactionType.Expense => Balance + transaction.Amount,
-            TransactionType.Transfer => Balance + transaction.Amount,
+            TransactionType.Transfer => transaction.IsIncomingTransfer
+                ? Balance - transaction.Amount
+                : Balance + transaction.Amount,
             _ => throw new DomainException("Tipo de transacción no válido")
         };
 
@@ -102,13 +146,17 @@ public class Account : Entity, IAggregateRoot, IUserOwned
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void UpdateInfo(string name, string? description)
+    public void UpdateInfo(string name, string? description, decimal? newBalance = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("El nombre de la cuenta es requerido");
 
         Name = name;
         Description = description;
+        if (newBalance.HasValue)
+        {
+            Balance = newBalance.Value;
+        }
         UpdatedAt = DateTime.UtcNow;
     }
 

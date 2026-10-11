@@ -13,7 +13,8 @@ public record CreateAccountCommand(
     string Name,
     string Type,
     string Currency,
-    string? Description
+    string? Description,
+    decimal InitialBalance = 0m
 ) : IRequest<Result<Guid>>;
 
 public class CreateAccountHandler : IRequestHandler<CreateAccountCommand, Result<Guid>>
@@ -35,7 +36,7 @@ public class CreateAccountHandler : IRequestHandler<CreateAccountCommand, Result
         if (!Enum.TryParse<Currency>(request.Currency, true, out var currency))
             return Result<Guid>.Fail($"Moneda inválida: {request.Currency}");
 
-        var account = new Account(request.Name, accountType, currency, request.Description);
+        var account = new Account(request.Name, accountType, currency, request.Description, initialBalance: request.InitialBalance);
 
         await _accountRepo.AddAsync(account, ct);
         await _unitOfWork.SaveChangesAsync(ct);

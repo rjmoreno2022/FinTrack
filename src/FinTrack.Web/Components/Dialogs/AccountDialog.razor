@@ -36,6 +36,28 @@
                     <MudSelectItem Value="@("USDT")">USDT - Tether</MudSelectItem>
                     <MudSelectItem Value="@("EUR")">EUR - Euros</MudSelectItem>
                 </MudSelect>
+
+                <MudNumericField T="decimal"
+                                 Label="Saldo Inicial"
+                                 @bind-Value="_initialBalance"
+                                 Format="N2"
+                                 Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="@_currency"
+                                 HelperText="Monto de apertura con el que inicia la cuenta"
+                                 Class="mb-3" />
+            }
+            else
+            {
+                <MudNumericField T="decimal"
+                                 Label="Saldo Actual"
+                                 @bind-Value="_balance"
+                                 Format="N2"
+                                 Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="@_currency"
+                                 HelperText="Modifica este valor para ajustar o conciliar el saldo real"
+                                 Class="mb-3" />
             }
 
             <MudTextField T="string?"
@@ -78,6 +100,8 @@
     private string _name = string.Empty;
     private string _type = "Bank";
     private string _currency = "USD";
+    private decimal _initialBalance = 0m;
+    private decimal _balance = 0m;
     private string? _description;
 
     protected override void OnInitialized()
@@ -87,6 +111,7 @@
             _name = Account.Name;
             _type = Account.Type;
             _currency = Account.Currency;
+            _balance = Account.Balance;
             _description = Account.Description;
         }
     }
@@ -108,6 +133,7 @@
                     Name = _name.Trim(),
                     Type = _type,
                     Currency = _currency,
+                    InitialBalance = _initialBalance,
                     Description = _description?.Trim()
                 };
                 await AccountService.CreateAsync(request);
@@ -117,7 +143,8 @@
                 var request = new UpdateAccountRequest
                 {
                     Name = _name.Trim(),
-                    Description = _description?.Trim()
+                    Description = _description?.Trim(),
+                    Balance = _balance
                 };
                 await AccountService.UpdateAsync(Account.Id, request);
             }

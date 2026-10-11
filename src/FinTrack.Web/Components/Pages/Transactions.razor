@@ -55,6 +55,7 @@
                 <MudSelectItem Value="@("")">Todos los Tipos</MudSelectItem>
                 <MudSelectItem Value="@("Income")">🟢 Solo Ingresos</MudSelectItem>
                 <MudSelectItem Value="@("Expense")">🔴 Solo Gastos</MudSelectItem>
+                <MudSelectItem Value="@("Transfer")">🔄 Solo Transferencias</MudSelectItem>
             </MudSelect>
         </MudItem>
         <MudItem xs="12" sm="8">
@@ -109,7 +110,14 @@ else
                 }
                 else
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info">Transferencia</MudChip>
+                    @if (context.IsIncomingTransfer)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Transf. Recibida</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">Transf. Enviada</MudChip>
+                    }
                 }
             </MudTd>
             <MudTd DataLabel="Categoría">
@@ -132,8 +140,11 @@ else
                 }
             </MudTd>
             <MudTd DataLabel="Monto" Style="text-align: right">
-                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(context.Type == "Income" ? Color.Success : Color.Error)">
-                    @(context.Type == "Income" ? "+" : "-") @context.Currency @context.Amount.ToString("N2")
+                @{
+                    bool isPositive = context.Type == "Income" || (context.Type == "Transfer" && context.IsIncomingTransfer);
+                }
+                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="@(isPositive ? Color.Success : Color.Error)">
+                    @(isPositive ? "+" : "-") @context.Currency @context.Amount.ToString("N2")
                 </MudText>
             </MudTd>
             <MudTd Style="text-align: right">
@@ -232,9 +243,13 @@ else
 
     private async Task DeleteTransaction(TransactionDto transaction)
     {
+        string message = transaction.Type == "Transfer"
+            ? $"¿Deseas eliminar la transferencia '{transaction.Description}' por {transaction.Currency} {transaction.Amount:N2}? Los saldos de ambas cuentas se revertirán automáticamente."
+            : $"¿Deseas eliminar la transacción '{transaction.Description}' por {transaction.Currency} {transaction.Amount:N2}? El balance de la cuenta se ajustará automáticamente.";
+
         bool? confirm = await DialogService.ShowMessageBoxAsync(
             "Eliminar Movimiento",
-            $"¿Deseas eliminar la transacción '{transaction.Description}' por {transaction.Currency} {transaction.Amount:N2}? El balance de la cuenta se ajustará automáticamente.",
+            message,
             yesText: "Eliminar", cancelText: "Cancelar");
 
         if (confirm == true)

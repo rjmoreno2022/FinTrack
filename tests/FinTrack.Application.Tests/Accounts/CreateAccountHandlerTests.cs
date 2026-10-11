@@ -82,4 +82,26 @@ public class CreateAccountHandlerTests
         _accountRepoMock.Verify(r => r.AddAsync(It.IsAny<Account>(), It.IsAny<CancellationToken>()), Times.Never);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_WithInitialBalance_ShouldCreateAccountWithSpecifiedBalance()
+    {
+        // Arrange
+        var command = new CreateAccountCommand("Cuenta Con Saldo", "Bank", "USD", "Ahorros", 1500m);
+
+        _accountRepoMock.Setup(r => r.AddAsync(It.IsAny<Account>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        _accountRepoMock.Verify(r => r.AddAsync(It.Is<Account>(a =>
+            a.Name == "Cuenta Con Saldo" &&
+            a.InitialBalance == 1500m &&
+            a.Balance == 1500m), It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

@@ -15,6 +15,7 @@ public interface IAccountService
     Task<Guid> CreateAsync(CreateAccountRequest request);
     Task UpdateAsync(Guid id, UpdateAccountRequest request);
     Task DeleteAsync(Guid id);
+    Task<Guid> TransferAsync(TransferFundsRequest request);
 }
 
 public class AccountService : IAccountService
@@ -42,7 +43,8 @@ public class AccountService : IAccountService
 
     public async Task<Guid> CreateAsync(CreateAccountRequest request)
     {
-        var command = new CreateAccountCommand(request.Name, request.Type, request.Currency, request.Description);
+        var command = new CreateAccountCommand(
+            request.Name, request.Type, request.Currency, request.Description, request.InitialBalance);
         var result = await _mediator.Send(command);
         if (!result.IsSuccess)
             throw new InvalidOperationException(result.Error ?? "Error al crear la cuenta");
@@ -52,7 +54,7 @@ public class AccountService : IAccountService
 
     public async Task UpdateAsync(Guid id, UpdateAccountRequest request)
     {
-        var command = new UpdateAccountCommand(id, request.Name, request.Description);
+        var command = new UpdateAccountCommand(id, request.Name, request.Description, request.Balance);
         var result = await _mediator.Send(command);
         if (!result.IsSuccess)
             throw new InvalidOperationException(result.Error ?? "Error al actualizar la cuenta");
@@ -64,5 +66,24 @@ public class AccountService : IAccountService
         var result = await _mediator.Send(command);
         if (!result.IsSuccess)
             throw new InvalidOperationException(result.Error ?? "Error al eliminar la cuenta");
+    }
+
+    public async Task<Guid> TransferAsync(TransferFundsRequest request)
+    {
+        var command = new TransferFundsCommand(
+            request.SourceAccountId,
+            request.DestinationAccountId,
+            request.Amount,
+            request.DestinationAmount,
+            request.Date,
+            request.Description,
+            request.CategoryId,
+            request.Tags
+        );
+        var result = await _mediator.Send(command);
+        if (!result.IsSuccess)
+            throw new InvalidOperationException(result.Error ?? "Error al realizar la transferencia");
+
+        return result.Value;
     }
 }

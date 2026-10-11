@@ -23,6 +23,10 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasConversion<string>()
             .HasMaxLength(10);
 
+        builder.Property(a => a.InitialBalance)
+            .HasPrecision(18, 4)
+            .HasDefaultValue(0m);
+
         builder.Property(a => a.Balance)
             .HasPrecision(18, 4);
 

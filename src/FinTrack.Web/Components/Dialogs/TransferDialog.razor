@@ -1,0 +1,283 @@
+@using FinTrack.Application.Accounts.DTOs
+@inject IAccountService AccountService
+@inject AppState AppState
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <!-- Cuenta Origen -->
+            <MudSelect T="Guid"
+                       Label="Cuenta Origen (De donde sale el dinero)"
+                       @bind-Value="_sourceAccountId"
+                       SelectedValuesChanged="OnSourceAccountChanged"
+                       Required="true"
+                       RequiredError="Debe seleccionar la cuenta de origen"
+                       Class="mb-3">
+                @foreach (var acc in _accounts.Where(a => a.IsActive))
+                {
+                    <MudSelectItem Value="@acc.Id">
+                        @acc.Name (@acc.Currency @acc.Balance.ToString("N2"))
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <!-- Cuenta Destino -->
+            <MudSelect T="Guid"
+                       Label="Cuenta Destino (Hacia donde va el dinero)"
+                       @bind-Value="_destinationAccountId"
+                       SelectedValuesChanged="OnDestinationAccountChanged"
+                       Required="true"
+                       RequiredError="Debe seleccionar la cuenta de destino"
+                       Class="mb-3">
+                @foreach (var acc in _accounts.Where(a => a.IsActive && a.Id != _sourceAccountId))
+                {
+                    <MudSelectItem Value="@acc.Id">
+                        @acc.Name (@acc.Currency @acc.Balance.ToString("N2"))
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <!-- Monto a Transferir (Origen) -->
+            <MudNumericField T="decimal"
+                             Label="Monto a Transferir"
+                             @bind-Value="_amount"
+                             Min="0.01m"
+                             Max="@_sourceMaxAmount"
+                             Required="true"
+                             RequiredError="El monto debe ser mayor a 0"
+                             Format="N2"
+                             Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                             Adornment="Adornment.Start"
+                             AdornmentText="@(_sourceAccount?.Currency ?? "$")"
+                             TextChanged="OnAmountChanged"
+                             Class="mb-3" />
+
+            <!-- Si las monedas difieren, mostrar monto destino y tasa -->
+            @if (_isDifferentCurrencies && _sourceAccount != null && _destinationAccount != null)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    Las monedas difieren (@_sourceAccount.Currency ➔ @_destinationAccount.Currency). Ingresa el monto que se acreditará en la cuenta destino.
+                </MudAlert>
+
+                <MudNumericField T="decimal"
+                                 Label="@($"Monto a Recibir en {_destinationAccount.Currency}")"
+                                 @bind-Value="_destinationAmount"
+                                 Min="0.01m"
+                                 Required="true"
+                                 RequiredError="El monto recibido debe ser mayor a 0"
+                                 Format="N2"
+                                 Culture="@System.Globalization.CultureInfo.InvariantCulture"
+                                 Adornment="Adornment.Start"
+                                 AdornmentText="@_destinationAccount.Currency"
+                                 Class="mb-3" />
+            }
+
+            <MudDatePicker Label="Fecha de la Transferencia"
+                           @bind-Date="_date"
+                           Required="true"
+                           Class="mb-3" />
+
+            <MudTextField T="string?"
+                          Label="Descripción / Motivo (Opcional)"
+                          @bind-Value="_description"
+                          Placeholder="@($"Transferencia a {_destinationAccount?.Name ?? "cuenta"}")"
+                          MaxLength="500"
+                          Class="mb-3" />
+
+            <!-- Tarjeta de Resumen / Proyección de Balances -->
+            @if (_sourceAccount != null && _destinationAccount != null)
+            {
+                <MudCard Outlined="true" Class="pa-3 mb-3 rounded-lg" Style="background-color: var(--mud-palette-background-grey);">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">📊 Vista Previa de Saldos</MudText>
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Origen: @_sourceAccount.Name</MudText>
+                            <MudText Typo="Typo.body2">
+                                Saldo actual: <b>@_sourceAccount.Currency @_sourceAccount.Balance.ToString("N2")</b>
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="@(_newSourceBalance >= 0 ? Color.Success : Color.Error)">
+                                Nuevo saldo: <b>@_sourceAccount.Currency @_newSourceBalance.ToString("N2")</b>
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Destino: @_destinationAccount.Name</MudText>
+                            <MudText Typo="Typo.body2">
+                                Saldo actual: <b>@_destinationAccount.Currency @_destinationAccount.Balance.ToString("N2")</b>
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success">
+                                Nuevo saldo: <b>@_destinationAccount.Currency @_newDestBalance.ToString("N2")</b>
+                            </MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudCard>
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.SwapHoriz"
+                   Disabled="@(!_isValid || _isSaving || _sourceAccountId == Guid.Empty || _destinationAccountId == Guid.Empty || _amount <= 0 || _amount > (_sourceAccount?.Balance ?? 0))"
+                   OnClick="Submit">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Transfiriendo...</span>
+            }
+            else
+            {
+                <span>Confirmar Transferencia</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Guid? PreselectedSourceAccountId { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isSaving;
+
+    private List<AccountDto> _accounts = new();
+    private Guid _sourceAccountId;
+    private Guid _destinationAccountId;
+    private decimal _amount = 10m;
+    private decimal _destinationAmount = 10m;
+    private DateTime? _date = DateTime.Today;
+    private string? _description;
+
+    private AccountDto? _sourceAccount => _accounts.FirstOrDefault(a => a.Id == _sourceAccountId);
+    private AccountDto? _destinationAccount => _accounts.FirstOrDefault(a => a.Id == _destinationAccountId);
+    private bool _isDifferentCurrencies => _sourceAccount != null && _destinationAccount != null &&
+        !string.Equals(_sourceAccount.Currency, _destinationAccount.Currency, StringComparison.OrdinalIgnoreCase);
+
+    private decimal _sourceMaxAmount => _sourceAccount?.Balance > 0 ? _sourceAccount.Balance : 0m;
+    private decimal _newSourceBalance => (_sourceAccount?.Balance ?? 0m) - _amount;
+    private decimal _newDestBalance => (_destinationAccount?.Balance ?? 0m) + (_isDifferentCurrencies ? _destinationAmount : _amount);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _accounts = await AccountService.GetAllAsync();
+
+        if (PreselectedSourceAccountId.HasValue && _accounts.Any(a => a.Id == PreselectedSourceAccountId.Value))
+        {
+            _sourceAccountId = PreselectedSourceAccountId.Value;
+        }
+        else if (_accounts.Any())
+        {
+            _sourceAccountId = _accounts.First().Id;
+        }
+
+        var availableDest = _accounts.FirstOrDefault(a => a.Id != _sourceAccountId);
+        if (availableDest != null)
+        {
+            _destinationAccountId = availableDest.Id;
+        }
+
+        RecalculateDestinationAmount();
+    }
+
+    private void OnSourceAccountChanged(IEnumerable<Guid> values)
+    {
+        if (_destinationAccountId == _sourceAccountId)
+        {
+            var other = _accounts.FirstOrDefault(a => a.Id != _sourceAccountId);
+            _destinationAccountId = other?.Id ?? Guid.Empty;
+        }
+        RecalculateDestinationAmount();
+    }
+
+    private void OnDestinationAccountChanged(IEnumerable<Guid> values)
+    {
+        RecalculateDestinationAmount();
+    }
+
+    private void OnAmountChanged(string value)
+    {
+        RecalculateDestinationAmount();
+    }
+
+    private void RecalculateDestinationAmount()
+    {
+        if (_sourceAccount == null || _destinationAccount == null)
+            return;
+
+        if (!_isDifferentCurrencies)
+        {
+            _destinationAmount = _amount;
+            return;
+        }
+
+        // Conversión estimada mediante AppState
+        try
+        {
+            var from = _sourceAccount.Currency;
+            var to = _destinationAccount.Currency;
+            decimal estimated = AppState.Convert(_amount, from, to);
+            _destinationAmount = Math.Round(estimated, 2);
+        }
+        catch
+        {
+            _destinationAmount = _amount;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        if (_sourceAccountId == Guid.Empty || _destinationAccountId == Guid.Empty)
+        {
+            Snackbar.Add("Debes seleccionar cuenta de origen y destino", Severity.Warning);
+            return;
+        }
+
+        if (_sourceAccountId == _destinationAccountId)
+        {
+            Snackbar.Add("La cuenta de destino debe ser diferente a la de origen", Severity.Warning);
+            return;
+        }
+
+        if (_sourceAccount != null && _amount > _sourceAccount.Balance)
+        {
+            Snackbar.Add($"Fondos insuficientes en {_sourceAccount.Name}", Severity.Error);
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var request = new TransferFundsRequest
+            {
+                SourceAccountId = _sourceAccountId,
+                DestinationAccountId = _destinationAccountId,
+                Amount = _amount,
+                DestinationAmount = _isDifferentCurrencies ? _destinationAmount : null,
+                Date = _date ?? DateTime.UtcNow,
+                Description = _description?.Trim()
+            };
+
+            await AccountService.TransferAsync(request);
+            Snackbar.Add("Transferencia realizada con éxito", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

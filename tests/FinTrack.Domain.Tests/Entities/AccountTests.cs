@@ -210,4 +210,86 @@ public class AccountTests
         act.Should().NotThrow();
         account.UserId.Should().Be(owner);
     }
+
+    [Fact]
+    public void Constructor_WithInitialBalance_ShouldSetInitialBalanceAndBalance()
+    {
+        var account = new Account("Banesco USD", AccountType.Bank, Currency.USD, initialBalance: 500m);
+
+        account.InitialBalance.Should().Be(500m);
+        account.Balance.Should().Be(500m);
+    }
+
+    [Fact]
+    public void SetBalance_ShouldUpdateBalanceAndTimestamp()
+    {
+        var account = new Account("Banesco USD", AccountType.Bank, Currency.USD, initialBalance: 100m);
+
+        account.SetBalance(250m);
+
+        account.Balance.Should().Be(250m);
+        account.UpdatedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void UpdateInfo_WithNewBalance_ShouldUpdateBalanceAndInfo()
+    {
+        var account = new Account("Banesco USD", AccountType.Bank, Currency.USD, "Desc", initialBalance: 100m);
+
+        account.UpdateInfo("Nuevo Nombre", "Nueva Desc", 350m);
+
+        account.Name.Should().Be("Nuevo Nombre");
+        account.Description.Should().Be("Nueva Desc");
+        account.Balance.Should().Be(350m);
+        account.UpdatedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddOutgoingTransfer_ShouldDecreaseBalanceAndAddTransferTransaction()
+    {
+        var source = new Account("Origen", AccountType.Bank, Currency.USD, initialBalance: 1000m);
+        var destId = Guid.NewGuid();
+
+        var tx = source.AddOutgoingTransfer(200m, destId, "Pago a destino", DateTime.UtcNow);
+
+        source.Balance.Should().Be(800m);
+        tx.Type.Should().Be(TransactionType.Transfer);
+        tx.Amount.Should().Be(200m);
+        tx.IsIncomingTransfer.Should().BeFalse();
+        source.Transactions.Should().ContainSingle().Which.Should().Be(tx);
+    }
+
+    [Fact]
+    public void AddIncomingTransfer_ShouldIncreaseBalanceAndAddTransferTransaction()
+    {
+        var dest = new Account("Destino", AccountType.Cash, Currency.USD, initialBalance: 100m);
+        var sourceId = Guid.NewGuid();
+
+        var tx = dest.AddIncomingTransfer(200m, sourceId, "Recepción desde origen", DateTime.UtcNow);
+
+        dest.Balance.Should().Be(300m);
+        tx.Type.Should().Be(TransactionType.Transfer);
+        tx.Amount.Should().Be(200m);
+        tx.IsIncomingTransfer.Should().BeTrue();
+        dest.Transactions.Should().ContainSingle().Which.Should().Be(tx);
+    }
+
+    [Fact]
+    public void RemoveTransaction_Transfer_ShouldRevertBalanceCorrectlyForIncomingAndOutgoing()
+    {
+        var source = new Account("Origen", AccountType.Bank, Currency.USD, initialBalance: 1000m);
+        var dest = new Account("Destino", AccountType.Cash, Currency.USD, initialBalance: 100m);
+
+        var outTx = source.AddOutgoingTransfer(200m, dest.Id, "Salida", DateTime.UtcNow);
+        var inTx = dest.AddIncomingTransfer(200m, source.Id, "Entrada", DateTime.UtcNow);
+
+        source.Balance.Should().Be(800m);
+        dest.Balance.Should().Be(300m);
+
+        source.RemoveTransaction(outTx.Id);
+        dest.RemoveTransaction(inTx.Id);
+
+        source.Balance.Should().Be(1000m);
+        dest.Balance.Should().Be(100m);
+    }
 }

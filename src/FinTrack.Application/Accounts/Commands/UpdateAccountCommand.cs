@@ -11,7 +11,8 @@ namespace FinTrack.Application.Accounts.Commands;
 public record UpdateAccountCommand(
     Guid Id,
     string Name,
-    string? Description
+    string? Description,
+    decimal? Balance = null
 ) : IRequest<Result>;
 
 public class UpdateAccountHandler : IRequestHandler<UpdateAccountCommand, Result>
@@ -31,7 +32,7 @@ public class UpdateAccountHandler : IRequestHandler<UpdateAccountCommand, Result
         if (account == null)
             return Result.Fail($"Cuenta con ID {request.Id} no encontrada");
 
-        account.UpdateInfo(request.Name, request.Description);
+        account.UpdateInfo(request.Name, request.Description, request.Balance);
 
         _accountRepo.Update(account);
         await _unitOfWork.SaveChangesAsync(ct);

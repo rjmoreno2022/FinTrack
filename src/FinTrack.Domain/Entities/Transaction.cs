@@ -23,6 +23,7 @@ public class Transaction : Entity
     public bool IsRecurring { get; private set; }
     public Guid? TransferAccountId { get; private set; }
     public Guid? RelatedTransactionId { get; private set; }
+    public bool IsIncomingTransfer { get; private set; }
 
     // EF Core requiere constructor vacío
     private Transaction() 
@@ -33,7 +34,7 @@ public class Transaction : Entity
     public Transaction(Guid accountId, TransactionType type, decimal amount,
         Currency currency, string description, DateTime date,
         Guid? categoryId = null, string? tags = null,
-        bool isRecurring = false)
+        bool isRecurring = false, bool isIncomingTransfer = false)
     {
         if (amount <= 0)
             throw new DomainException("El monto debe ser mayor a cero");
@@ -49,6 +50,7 @@ public class Transaction : Entity
         CategoryId = categoryId;
         Tags = tags;
         IsRecurring = isRecurring;
+        IsIncomingTransfer = isIncomingTransfer;
     }
 
     public void Update(string description, DateTime date, Guid? categoryId, string? tags)

@@ -46,7 +46,7 @@ public class AccountsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateAccountRequest request)
     {
         var command = new CreateAccountCommand(
-            request.Name, request.Type, request.Currency, request.Description);
+            request.Name, request.Type, request.Currency, request.Description, request.InitialBalance);
         var result = await _mediator.Send(command);
         return result.IsSuccess
             ? CreatedAtAction(nameof(GetById), new { id = result.Value }, new { id = result.Value })
@@ -56,9 +56,28 @@ public class AccountsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAccountRequest request)
     {
-        var command = new UpdateAccountCommand(id, request.Name, request.Description);
+        var command = new UpdateAccountCommand(id, request.Name, request.Description, request.Balance);
         var result = await _mediator.Send(command);
         return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Error, errors = result.Errors });
+    }
+
+    [HttpPost("transfer")]
+    public async Task<IActionResult> Transfer([FromBody] TransferFundsRequest request)
+    {
+        var command = new TransferFundsCommand(
+            request.SourceAccountId,
+            request.DestinationAccountId,
+            request.Amount,
+            request.DestinationAmount,
+            request.Date,
+            request.Description,
+            request.CategoryId,
+            request.Tags
+        );
+        var result = await _mediator.Send(command);
+        return result.IsSuccess
+            ? Ok(new { id = result.Value })
+            : BadRequest(new { error = result.Error, errors = result.Errors });
     }
 
     [HttpDelete("{id:guid}")]
