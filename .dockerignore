@@ -1,0 +1,29 @@
+# 1. Compilación y binarios temporales de .NET (un solo **/ cubre cualquier subcarpeta)
+**/bin/
+**/obj/
+**/TestResults/
+
+# 2. Archivos locales del IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# 3. Control de versiones, logs y documentación pesada
+.git/
+.gitignore
+*.log
+*.md
+*.html
+
+# 4. Configuración local y secretos
+.env
+.env.*
+*.local
+**/appsettings.Development.json
+
+# 5. Archivos de infraestructura Docker (no hace falta que vivan dentro del contenedor)
+Dockerfile*
+docker-compose*
+.dockerignore
