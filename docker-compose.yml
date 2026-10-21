@@ -1,0 +1,37 @@
+services:
+  # ==========================================
+  # SERVICIO 1: Base de Datos (SQL Server 2022)
+  # ==========================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fintrack-db
+    environment:
+      - ACCEPT_EULA=Y                     # Aceptamos la licencia de Microsoft
+      - MSSQL_SA_PASSWORD=FinTrackSecure2026! # Clave del usuario 'sa' (debe tener mayúsculas, minúsculas y números)
+    ports:
+      - "1433:1433"                       # Por si quieres conectarte desde SQL Server Management Studio en tu PC
+    volumes:
+      - fintrack_db_data:/var/opt/mssql   # ¡El disco duro externo para no perder datos!
+
+  # ==========================================
+  # SERVICIO 2: Tu Aplicación Web (FinTrack)
+  # ==========================================
+  fintrack-web:
+    container_name: fintrack-web
+    build:
+      context: .                          # La raíz donde está el código
+      dockerfile: Dockerfile              # El Dockerfile que creamos en el paso anterior
+    ports:
+      - "8080:8080"                       # Abres http://localhost:8080 en tu navegador
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Fíjate que el Server es 'sqlserver' (el nombre del servicio de arriba)
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=FinTrack;User Id=sa;Password=FinTrackSecure2026!;TrustServerCertificate=True;MultipleActiveResultSets=true
+    depends_on:
+      - sqlserver                         # Le dice a Docker: "Enciende la base de datos antes de encender la web"
+
+# ==========================================
+# DEFINICIÓN DE VOLÚMENES PERSISTENTES
+# ==========================================
+volumes:
+  fintrack_db_data:                       # Docker administrará este disco virtual en tu sistema

@@ -1,8 +1,7 @@
-using System;
-using System.Text;
 using FinTrack.Application;
 using FinTrack.Application.Common.Interfaces;
 using FinTrack.Infrastructure;
+using FinTrack.Infrastructure.Data;
 using FinTrack.Web.Components;
 using FinTrack.Web.Middleware;
 using FinTrack.Web.Services;
@@ -10,7 +9,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
+using System;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,6 +97,47 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+// Aplicar migraciones automáticamente si la base de datos no existe o está desactualizada
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        var context = services.GetRequiredService<FinTrackDbContext>();
+        // En Docker, SQL Server puede tardar varios segundos en estar listo para aceptar conexiones.
+        // Reintentamos hasta 6 veces con pausa de 3 segundos para darle tiempo a inicializarse.
+        var retries = 6;
+        while (retries > 0)
+        {
+            try
+            {
+                context.Database.Migrate();
+                logger.LogInformation("Base de datos conectada y migraciones aplicadas exitosamente.");
+                break;
+            }
+            catch (Exception ex)
+            {
+                retries--;
+                if (retries == 0)
+                {
+                    logger.LogError(ex, "No se pudo conectar a la base de datos tras múltiples intentos.");
+                }
+                else
+                {
+                    logger.LogWarning("Esperando a que SQL Server esté listo... Reintentando en 3 segundos ({IntentosRestantes} restantes).", retries);
+                    Thread.Sleep(3000);
+                }
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Ocurrió un error al aplicar las migraciones en la base de datos.");
+    }
+}
 
 // Global Error Handling Middleware
 app.UseMiddleware<ErrorHandlingMiddleware>();

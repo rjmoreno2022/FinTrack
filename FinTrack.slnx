@@ -1,7 +1,7 @@
 <Solution>
-  <Project Path="src/FinTrack.Domain/FinTrack.Domain.csproj" />
   <Folder Name="/Solution Items/">
     <File Path=".dockerignore" />
+    <File Path="docker-compose.yml" />
     <File Path="Dockerfile" />
   </Folder>
   <Folder Name="/tests/">
@@ -9,8 +9,9 @@
     <Project Path="tests/FinTrack.UI.Tests/FinTrack.UI.Tests.csproj" />
   </Folder>
   <Project Path="src/FinTrack.Application/FinTrack.Application.csproj" />
+  <Project Path="src/FinTrack.Domain/FinTrack.Domain.csproj" />
   <Project Path="src/FinTrack.Infrastructure/FinTrack.Infrastructure.csproj" />
   <Project Path="src/FinTrack.Web/FinTrack.Web.csproj" />
-  <Project Path="tests/FinTrack.Domain.Tests/FinTrack.Domain.Tests.csproj" />
   <Project Path="tests/FinTrack.Application.Tests/FinTrack.Application.Tests.csproj" />
+  <Project Path="tests/FinTrack.Domain.Tests/FinTrack.Domain.Tests.csproj" />
 </Solution>
